@@ -380,7 +380,7 @@
 
 <body>
   <h1>PDF Organizer</h1>
-  <p class="description">다운로드된 PDF를 기존 폴더 또는 !zz_Singles 기준으로 정리합니다.</p>
+  <p class="description">다운로드된 PDF를 기존 디자이너 폴더 또는 !zz_Singles 기준으로 정리합니다.</p>
 
   <section class="panel">
     <div class="panel-header">
@@ -413,7 +413,7 @@
       type="text"
       id="designerSearch"
       class="search-box"
-      placeholder="전체 폴더 검색: Knitree, 마요, Lauren..."
+      placeholder="전체 디자이너 검색: Knitree, 마요, Lauren..."
       disabled
     >
 
@@ -424,7 +424,7 @@
     <h2>3. 새 PDF 정리 미리보기</h2>
 
     <p class="note">
-      기존 폴더를 선택하거나 새 저장 기준 이름을 입력하세요.
+      기존 디자이너를 선택하거나 새 저장 기준 이름을 입력하세요.
       입력이 끝나면 중복 검사를 실행한 뒤 정리 실행 버튼을 누릅니다.
     </p>
 
@@ -434,6 +434,8 @@
       <strong>Designer_-_Pattern</strong>,
       <strong>Pattern_Designer</strong>,
       <strong>Pattern by Designer</strong><br>
+      저장 기준 이름을 입력하면 파일명 속 디자이너 표기에도 자동 적용됩니다.
+      한국어 저장명처럼 원본 표기와 다른 경우에는 두 번째 칸만 직접 수정하면 됩니다.<br>
       완전히 같은 PDF가 이미 저장되어 있으면 파일명이 달라도 다운로드본만 삭제합니다.<br>
       같은 최종 파일명이 있지만 내용이 다르면 해당 파일만 보류합니다.
     </div>
@@ -680,13 +682,15 @@
         destinationName: "",
         selectedFolder: null,
         sourceDesignerName: "",
+        sourceDesignerTouched: false,
         patternFileName: entry.name,
         patternManuallyEdited: false,
         previewElement: null,
         statusElement: null,
         analysis: {
           action: "unchecked",
-          message: ""
+          message: "",
+          matchPath: ""
         }
       };
     }
@@ -698,7 +702,8 @@
       downloadFiles.forEach((file) => {
         file.analysis = {
           action: "unchecked",
-          message: ""
+          message: "",
+          matchPath: ""
         };
       });
 
@@ -778,7 +783,7 @@
 
         const destinationLabel = document.createElement("label");
         destinationLabel.className = "field-label";
-        destinationLabel.textContent = "저장 기준 디자이너명 / 기존 폴더 검색";
+        destinationLabel.textContent = "저장 기준 디자이너명 / 기존 디자이너 검색";
 
         const destinationInput = document.createElement("input");
         destinationInput.className = "text-input";
@@ -790,7 +795,7 @@
         selectedLabel.className = "selected-label";
 
         if (file.selectedFolder) {
-          selectedLabel.textContent = `기존 폴더 선택됨: ${file.selectedFolder}`;
+          selectedLabel.textContent = `기존 디자이너 선택됨: ${file.selectedFolder}`;
         }
 
         const suggestionsContainer = document.createElement("div");
@@ -816,7 +821,7 @@
         const sourceDesignerHint = document.createElement("div");
         sourceDesignerHint.className = "field-hint";
         sourceDesignerHint.textContent =
-          "원본 파일명에서 제거할 이름입니다. 저장 폴더명과 달라도 됩니다.";
+          "원본 파일명에서 제거할 이름입니다. 저장 기준 이름과 다르면 이 칸만 수정하세요.";
 
         sourceDesignerField.appendChild(sourceDesignerLabel);
         sourceDesignerField.appendChild(sourceDesignerInput);
@@ -879,6 +884,19 @@
           file.selectedFolder = null;
           selectedLabel.textContent = "";
 
+          if (!file.sourceDesignerTouched) {
+            file.sourceDesignerName = file.destinationName;
+            sourceDesignerInput.value = file.sourceDesignerName;
+
+            if (!file.patternManuallyEdited) {
+              file.patternFileName = suggestPatternFileName(
+                file.name,
+                file.sourceDesignerName
+              );
+              patternInput.value = file.patternFileName;
+            }
+          }
+
           renderSuggestions(
             file,
             suggestionsContainer,
@@ -903,6 +921,7 @@
         });
 
         sourceDesignerInput.addEventListener("input", () => {
+          file.sourceDesignerTouched = true;
           file.sourceDesignerName = sourceDesignerInput.value.trim();
 
           if (!file.patternManuallyEdited) {
@@ -971,7 +990,7 @@
         const noMatch = document.createElement("div");
         noMatch.className = "no-match";
         noMatch.textContent =
-          "기존 폴더 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
+          "기존 디자이너 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
         container.appendChild(noMatch);
         return;
       }
@@ -991,10 +1010,10 @@
           file.selectedFolder = folderName;
           file.destinationName = folderName;
           destinationInput.value = folderName;
-          selectedLabel.textContent = `기존 폴더 선택됨: ${folderName}`;
+          selectedLabel.textContent = `기존 디자이너 선택됨: ${folderName}`;
           container.innerHTML = "";
 
-          if (!file.sourceDesignerName) {
+          if (!file.sourceDesignerTouched) {
             file.sourceDesignerName = aliasUsedForSearch;
             sourceDesignerInput.value = aliasUsedForSearch;
 
@@ -1201,6 +1220,7 @@
 
       await markExactContentDuplicates(group.files, storedFiles);
       await markIncomingBatchDuplicates(group.files);
+
       markNameConflicts(
         group.files,
         storedFiles,
