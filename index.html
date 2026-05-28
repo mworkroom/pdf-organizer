@@ -71,7 +71,7 @@
 
     button:disabled {
       cursor: not-allowed;
-      opacity: 0.65;
+      opacity: 0.6;
     }
 
     .secondary-button {
@@ -80,9 +80,30 @@
       padding: 8px 12px;
       font-size: 13px;
       margin-top: 8px;
+      margin-right: 6px;
     }
 
     .secondary-button:hover {
+      background: #ddd6cd;
+    }
+
+    .remember-button {
+      background: #546b62;
+      color: white;
+    }
+
+    .remember-button:hover {
+      background: #647e74;
+    }
+
+    .delete-button {
+      background: #ede8e1;
+      color: #555;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .delete-button:hover {
       background: #ddd6cd;
     }
 
@@ -182,6 +203,40 @@
       line-height: 1.7;
     }
 
+    .alias-box {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #ece7e1;
+    }
+
+    .alias-title {
+      font-size: 15px;
+      font-weight: bold;
+      margin: 0 0 10px;
+    }
+
+    .alias-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #faf9f7;
+      border: 1px solid #ece7e1;
+      border-radius: 9px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+
+    .alias-text {
+      word-break: break-all;
+    }
+
+    .alias-arrow {
+      color: #999;
+      padding: 0 6px;
+    }
+
     .sort-row {
       border: 1px solid #e6e1da;
       border-radius: 14px;
@@ -262,6 +317,7 @@
       font-size: 12px;
       color: #1e4d3b;
       margin-top: 6px;
+      line-height: 1.5;
     }
 
     .preview-area {
@@ -418,6 +474,19 @@
     >
 
     <div id="designerFolderList" class="list"></div>
+
+    <div class="alias-box">
+      <p class="alias-title">
+        기억된 디자이너 연결 <span id="aliasCount"></span>
+      </p>
+
+      <p class="note">
+        기억된 연결은 이 브라우저에 저장됩니다.
+        잘못 저장한 연결은 삭제할 수 있습니다.
+      </p>
+
+      <div id="aliasList" style="margin-top: 12px;"></div>
+    </div>
   </section>
 
   <section id="sortingPanel" class="panel hidden">
@@ -425,7 +494,7 @@
 
     <p class="note">
       기존 디자이너를 선택하거나 새 저장 기준 이름을 입력하세요.
-      입력이 끝나면 중복 검사를 실행한 뒤 정리 실행 버튼을 누릅니다.
+      기존 디자이너를 선택한 뒤 ‘이 연결 기억’을 누르면 다음부터 자동 선택됩니다.
     </p>
 
     <div class="rule-box">
@@ -434,8 +503,6 @@
       <strong>Designer_-_Pattern</strong>,
       <strong>Pattern_Designer</strong>,
       <strong>Pattern by Designer</strong><br>
-      저장 기준 이름을 입력하면 파일명 속 디자이너 표기에도 자동 적용됩니다.
-      한국어 저장명처럼 원본 표기와 다른 경우에는 두 번째 칸만 직접 수정하면 됩니다.<br>
       완전히 같은 PDF가 이미 저장되어 있으면 파일명이 달라도 다운로드본만 삭제합니다.<br>
       같은 최종 파일명이 있지만 내용이 다르면 해당 파일만 보류합니다.
     </div>
@@ -451,6 +518,7 @@
 
   <script>
     const SINGLES_FOLDER_NAME = "!zz_Singles";
+    const ALIAS_STORAGE_KEY = "pdfOrganizerDesignerAliasesV1";
 
     const selectDownloadFolderButton = document.getElementById("selectDownloadFolderButton");
     const downloadFolderName = document.getElementById("downloadFolderName");
@@ -463,6 +531,9 @@
     const singlesFileCount = document.getElementById("singlesFileCount");
     const designerSearch = document.getElementById("designerSearch");
     const designerFolderList = document.getElementById("designerFolderList");
+
+    const aliasCount = document.getElementById("aliasCount");
+    const aliasList = document.getElementById("aliasList");
 
     const sortingPanel = document.getElementById("sortingPanel");
     const sortingList = document.getElementById("sortingList");
@@ -478,30 +549,19 @@
     let designerFolders = [];
     let singlesPdfNames = [];
 
+    let designerAliases = loadDesignerAliases();
     let duplicateCheckComplete = false;
     let digestCache = new Map();
+
+    renderAliasList();
 
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         downloadDirectoryHandle = await window.showDirectoryPicker();
 
         downloadFolderName.textContent = `선택한 폴더: ${downloadDirectoryHandle.name}`;
-        downloadFiles = [];
 
-        for await (const entry of downloadDirectoryHandle.values()) {
-          if (
-            entry.kind === "file" &&
-            entry.name.toLowerCase().endsWith(".pdf")
-          ) {
-            downloadFiles.push(createDownloadFileRecord(entry));
-          }
-        }
-
-        downloadFiles.sort((a, b) => a.name.localeCompare(b.name, "ko"));
-
-        invalidateDuplicateCheck();
-        renderDownloadFileList();
-        renderSortingRows();
+        await reloadDownloadData();
 
       } catch (error) {
         if (error.name !== "AbortError") {
@@ -519,7 +579,10 @@
         designerSearch.value = "";
 
         await reloadLibraryData();
+
+        applyRememberedConnectionsToEmptyFiles();
         invalidateDuplicateCheck();
+
         renderDesignerFolders(designerFolders);
         renderSortingRows();
 
@@ -685,6 +748,7 @@
         sourceDesignerTouched: false,
         patternFileName: entry.name,
         patternManuallyEdited: false,
+        autoLinkedAlias: "",
         previewElement: null,
         statusElement: null,
         analysis: {
@@ -693,6 +757,163 @@
           matchPath: ""
         }
       };
+    }
+
+    function loadDesignerAliases() {
+      try {
+        return JSON.parse(localStorage.getItem(ALIAS_STORAGE_KEY)) || {};
+      } catch (error) {
+        return {};
+      }
+    }
+
+    function saveDesignerAliases() {
+      localStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(designerAliases));
+      renderAliasList();
+    }
+
+    function renderAliasList() {
+      aliasList.innerHTML = "";
+
+      const aliases = Object.keys(designerAliases)
+        .sort((a, b) => a.localeCompare(b, "ko"));
+
+      aliasCount.textContent = `(${aliases.length}개)`;
+
+      if (aliases.length === 0) {
+        aliasList.innerHTML =
+          `<p class="empty">아직 기억된 연결이 없습니다.</p>`;
+        return;
+      }
+
+      aliases.forEach((alias) => {
+        const row = document.createElement("div");
+        row.className = "alias-row";
+
+        const text = document.createElement("div");
+        text.className = "alias-text";
+        text.innerHTML =
+          `<strong>${escapeHtml(alias)}</strong>` +
+          `<span class="alias-arrow">→</span>` +
+          `${escapeHtml(designerAliases[alias])}`;
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "delete-button";
+        button.textContent = "삭제";
+
+        button.addEventListener("click", () => {
+          delete designerAliases[alias];
+          saveDesignerAliases();
+        });
+
+        row.appendChild(text);
+        row.appendChild(button);
+        aliasList.appendChild(row);
+      });
+    }
+
+    function rememberConnection(file) {
+      const alias = file.sourceDesignerName.trim();
+      const folderName = getExistingFolderName(file);
+
+      if (!folderName) {
+        alert("먼저 기존 디자이너를 선택하세요.");
+        return;
+      }
+
+      if (!alias) {
+        alert("파일명 속 디자이너 표기를 입력하세요.");
+        return;
+      }
+
+      const existingAliasKey = Object.keys(designerAliases).find(
+        (key) => normalizeText(key) === normalizeText(alias)
+      );
+
+      const previousFolder = existingAliasKey
+        ? designerAliases[existingAliasKey]
+        : null;
+
+      if (
+        previousFolder &&
+        normalizeText(previousFolder) !== normalizeText(folderName)
+      ) {
+        const replaceConfirmed = window.confirm(
+          `이미 다른 연결이 저장되어 있습니다.\n\n` +
+          `${alias} → ${previousFolder}\n\n` +
+          `${alias} → ${folderName} 으로 바꿀까요?`
+        );
+
+        if (!replaceConfirmed) {
+          return;
+        }
+      }
+
+      if (existingAliasKey) {
+        delete designerAliases[existingAliasKey];
+      }
+
+      designerAliases[alias] = folderName;
+      saveDesignerAliases();
+
+      file.autoLinkedAlias = alias;
+
+      applyRememberedConnectionsToEmptyFiles();
+      invalidateDuplicateCheck();
+      renderSortingRows();
+    }
+
+    function applyRememberedConnectionsToEmptyFiles() {
+      if (designerFolders.length === 0) {
+        return;
+      }
+
+      downloadFiles.forEach((file) => {
+        if (
+          file.destinationName.trim() ||
+          file.selectedFolder ||
+          file.sourceDesignerTouched ||
+          file.patternManuallyEdited
+        ) {
+          return;
+        }
+
+        const match = findMatchingRememberedAlias(file.name);
+
+        if (!match) {
+          return;
+        }
+
+        file.selectedFolder = match.folderName;
+        file.destinationName = match.folderName;
+        file.sourceDesignerName = match.alias;
+        file.patternFileName = suggestPatternFileName(file.name, match.alias);
+        file.autoLinkedAlias = match.alias;
+      });
+    }
+
+    function findMatchingRememberedAlias(originalFileName) {
+      const untouchedName =
+        ensurePdfExtension(removePdfExtension(originalFileName).trim());
+
+      const possibleMatches = Object.keys(designerAliases)
+        .map((alias) => ({
+          alias,
+          folderName: designerAliases[alias]
+        }))
+        .filter((item) =>
+          designerFolders.some(
+            (folderName) =>
+              normalizeText(folderName) === normalizeText(item.folderName)
+          )
+        )
+        .filter((item) =>
+          suggestPatternFileName(originalFileName, item.alias) !== untouchedName
+        )
+        .sort((a, b) => b.alias.length - a.alias.length);
+
+      return possibleMatches[0] || null;
     }
 
     function invalidateDuplicateCheck() {
@@ -709,6 +930,7 @@
 
       executeStatus.className = "execute-status";
       executeStatus.textContent = "";
+
       updateAllPreviews();
     }
 
@@ -783,7 +1005,8 @@
 
         const destinationLabel = document.createElement("label");
         destinationLabel.className = "field-label";
-        destinationLabel.textContent = "저장 기준 디자이너명 / 기존 디자이너 검색";
+        destinationLabel.textContent =
+          "저장 기준 디자이너명 / 기존 디자이너 검색";
 
         const destinationInput = document.createElement("input");
         destinationInput.className = "text-input";
@@ -795,7 +1018,9 @@
         selectedLabel.className = "selected-label";
 
         if (file.selectedFolder) {
-          selectedLabel.textContent = `기존 디자이너 선택됨: ${file.selectedFolder}`;
+          selectedLabel.textContent = file.autoLinkedAlias
+            ? `자동 연결됨: ${file.autoLinkedAlias} → ${file.selectedFolder}`
+            : `기존 디자이너 선택됨: ${file.selectedFolder}`;
         }
 
         const suggestionsContainer = document.createElement("div");
@@ -821,11 +1046,22 @@
         const sourceDesignerHint = document.createElement("div");
         sourceDesignerHint.className = "field-hint";
         sourceDesignerHint.textContent =
-          "원본 파일명에서 제거할 이름입니다. 저장 기준 이름과 다르면 이 칸만 수정하세요.";
+          "원본 파일명에서 제거할 이름입니다. 기존 디자이너를 선택한 뒤 이 표기를 연결로 저장할 수 있습니다.";
+
+        const rememberButton = document.createElement("button");
+        rememberButton.type = "button";
+        rememberButton.className = "secondary-button remember-button";
+        rememberButton.textContent = "이 연결 기억";
+        rememberButton.disabled = !getExistingFolderName(file);
+
+        rememberButton.addEventListener("click", () => {
+          rememberConnection(file);
+        });
 
         sourceDesignerField.appendChild(sourceDesignerLabel);
         sourceDesignerField.appendChild(sourceDesignerInput);
         sourceDesignerField.appendChild(sourceDesignerHint);
+        sourceDesignerField.appendChild(rememberButton);
 
         const patternField = document.createElement("div");
         patternField.className = "field";
@@ -882,6 +1118,7 @@
         destinationInput.addEventListener("input", () => {
           file.destinationName = destinationInput.value.trim();
           file.selectedFolder = null;
+          file.autoLinkedAlias = "";
           selectedLabel.textContent = "";
 
           if (!file.sourceDesignerTouched) {
@@ -897,13 +1134,16 @@
             }
           }
 
+          rememberButton.disabled = true;
+
           renderSuggestions(
             file,
             suggestionsContainer,
             destinationInput,
             sourceDesignerInput,
             patternInput,
-            selectedLabel
+            selectedLabel,
+            rememberButton
           );
 
           invalidateDuplicateCheck();
@@ -916,7 +1156,8 @@
             destinationInput,
             sourceDesignerInput,
             patternInput,
-            selectedLabel
+            selectedLabel,
+            rememberButton
           );
         });
 
@@ -969,7 +1210,8 @@
       destinationInput,
       sourceDesignerInput,
       patternInput,
-      selectedLabel
+      selectedLabel,
+      rememberButton
     ) {
       container.innerHTML = "";
 
@@ -1009,9 +1251,14 @@
 
           file.selectedFolder = folderName;
           file.destinationName = folderName;
+          file.autoLinkedAlias = "";
           destinationInput.value = folderName;
-          selectedLabel.textContent = `기존 디자이너 선택됨: ${folderName}`;
+
+          selectedLabel.textContent =
+            `기존 디자이너 선택됨: ${folderName}`;
+
           container.innerHTML = "";
+          rememberButton.disabled = false;
 
           if (!file.sourceDesignerTouched) {
             file.sourceDesignerName = aliasUsedForSearch;
@@ -1057,13 +1304,15 @@
 
       if (!destinationName || !patternFileName) {
         preview.classList.add("pending");
-        preview.textContent = "저장 기준 이름과 패턴 파일명을 입력하세요.";
+        preview.textContent =
+          "저장 기준 이름과 패턴 파일명을 입력하세요.";
         return;
       }
 
       if (existingFolderName) {
         preview.classList.add("existing");
-        preview.textContent = `${existingFolderName}/${patternFileName}`;
+        preview.textContent =
+          `${existingFolderName}/${patternFileName}`;
         return;
       }
 
@@ -1071,12 +1320,13 @@
       const incomingFiles = findIncomingFilesForDesigner(destinationName);
 
       const countableIncoming = duplicateCheckComplete
-        ? incomingFiles.filter((incomingFile) =>
-            incomingFile.analysis.action === "move"
+        ? incomingFiles.filter(
+            (incomingFile) => incomingFile.analysis.action === "move"
           )
         : incomingFiles;
 
-      const totalCount = existingSingles.length + countableIncoming.length;
+      const totalCount =
+        existingSingles.length + countableIncoming.length;
 
       if (totalCount >= 3) {
         preview.classList.add("promote");
@@ -1132,11 +1382,9 @@
 
       const destinationKey = normalizeText(file.destinationName);
 
-      const exactMatch = designerFolders.find(
+      return designerFolders.find(
         (folderName) => normalizeText(folderName) === destinationKey
-      );
-
-      return exactMatch || null;
+      ) || null;
     }
 
     function findSinglesFiles(destinationName) {
@@ -1213,10 +1461,8 @@
       const directoryHandle =
         await libraryDirectoryHandle.getDirectoryHandle(group.folderName);
 
-      const storedFiles = await listPdfCandidates(
-        directoryHandle,
-        group.folderName
-      );
+      const storedFiles =
+        await listPdfCandidates(directoryHandle, group.folderName);
 
       await markExactContentDuplicates(group.files, storedFiles);
       await markIncomingBatchDuplicates(group.files);
@@ -1230,17 +1476,18 @@
     }
 
     async function analyseSinglesGroup(group) {
-      const storedFiles = await listSinglesCandidates(group.destinationName);
+      const storedFiles =
+        await listSinglesCandidates(group.destinationName);
 
       await markExactContentDuplicates(group.files, storedFiles);
       await markIncomingBatchDuplicates(group.files);
 
-      const activeFilesBeforeConflict = group.files.filter(
+      const activeFiles = group.files.filter(
         (file) => file.analysis.action === "move"
       );
 
       const willPromote =
-        storedFiles.length + activeFilesBeforeConflict.length >= 3;
+        storedFiles.length + activeFiles.length >= 3;
 
       if (willPromote) {
         markNameConflicts(
@@ -1248,7 +1495,10 @@
           storedFiles,
           (file) => ensurePdfExtension(file.patternFileName.trim()),
           (storedFile) =>
-            removeSinglesDesignerPrefix(storedFile.name, group.destinationName)
+            removeSinglesDesignerPrefix(
+              storedFile.name,
+              group.destinationName
+            )
         );
       } else {
         markNameConflicts(
@@ -1293,7 +1543,7 @@
           continue;
         }
 
-        let duplicateOfIncoming = null;
+        let duplicate = null;
 
         for (const keptFile of keptFiles) {
           const identical = await filesAreIdentical(
@@ -1302,16 +1552,16 @@
           );
 
           if (identical) {
-            duplicateOfIncoming = keptFile;
+            duplicate = keptFile;
             break;
           }
         }
 
-        if (duplicateOfIncoming) {
+        if (duplicate) {
           incomingFile.analysis = {
             action: "deleteDuplicate",
             message: "",
-            matchPath: `이번 다운로드 폴더의 ${duplicateOfIncoming.name}`
+            matchPath: `이번 다운로드 폴더의 ${duplicate.name}`
           };
         } else {
           keptFiles.push(incomingFile);
@@ -1340,7 +1590,8 @@
         }
 
         const targetName = getIncomingTargetName(incomingFile);
-        const matchingStoredFile = storedNames.get(normalizeText(targetName));
+        const matchingStoredFile =
+          storedNames.get(normalizeText(targetName));
 
         if (matchingStoredFile) {
           incomingFile.analysis = {
@@ -1352,7 +1603,7 @@
         }
       });
 
-      const incomingTargetNames = new Map();
+      const incomingNames = new Map();
 
       incomingFiles.forEach((incomingFile) => {
         if (incomingFile.analysis.action !== "move") {
@@ -1362,8 +1613,8 @@
         const targetName = getIncomingTargetName(incomingFile);
         const key = normalizeText(targetName);
 
-        if (incomingTargetNames.has(key)) {
-          const previousFile = incomingTargetNames.get(key);
+        if (incomingNames.has(key)) {
+          const previousFile = incomingNames.get(key);
 
           previousFile.analysis = {
             action: "hold",
@@ -1379,7 +1630,7 @@
             matchPath: ""
           };
         } else {
-          incomingTargetNames.set(key, incomingFile);
+          incomingNames.set(key, incomingFile);
         }
       });
     }
@@ -1429,29 +1680,22 @@
     }
 
     async function filesAreIdentical(firstHandle, secondHandle) {
-      const firstInfo = await getFileDigest(firstHandle);
-      const secondInfo = await getFileDigest(secondHandle);
+      const first = await getFileDigest(firstHandle);
+      const second = await getFileDigest(secondHandle);
 
-      if (firstInfo.size !== secondInfo.size) {
-        return false;
-      }
-
-      return firstInfo.hash === secondInfo.hash;
+      return first.size === second.size && first.hash === second.hash;
     }
 
     async function getFileDigest(fileHandle) {
-      const file = await fileHandle.getFile();
-      const cacheKey = `${file.name}|${file.size}|${file.lastModified}`;
-
-      if (digestCache.has(cacheKey)) {
-        return digestCache.get(cacheKey);
+      if (digestCache.has(fileHandle)) {
+        return digestCache.get(fileHandle);
       }
 
-      const arrayBuffer = await file.arrayBuffer();
-      const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const file = await fileHandle.getFile();
+      const buffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
 
-      const hash = hashArray
+      const hash = Array.from(new Uint8Array(hashBuffer))
         .map((byte) => byte.toString(16).padStart(2, "0"))
         .join("");
 
@@ -1460,7 +1704,8 @@
         hash
       };
 
-      digestCache.set(cacheKey, info);
+      digestCache.set(fileHandle, info);
+
       return info;
     }
 
@@ -1521,6 +1766,15 @@
       return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
 
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     async function buildExecutionPlans() {
       const movePlans = [];
       const deletePlans = [];
@@ -1540,8 +1794,11 @@
           return;
         }
 
-        const patternFileName = ensurePdfExtension(file.patternFileName.trim());
-        const existingFolderName = getExistingFolderName(file);
+        const patternFileName =
+          ensurePdfExtension(file.patternFileName.trim());
+
+        const existingFolderName =
+          getExistingFolderName(file);
 
         if (existingFolderName) {
           movePlans.push({
@@ -1555,27 +1812,30 @@
         }
 
         const destinationName = file.destinationName.trim();
-        const groupKey = normalizeText(destinationName);
+        const key = normalizeText(destinationName);
 
-        if (!newDesignerGroups.has(groupKey)) {
-          newDesignerGroups.set(groupKey, {
+        if (!newDesignerGroups.has(key)) {
+          newDesignerGroups.set(key, {
             destinationName,
             files: []
           });
         }
 
-        newDesignerGroups.get(groupKey).files.push({
+        newDesignerGroups.get(key).files.push({
           sourceFile: file,
           patternFileName
         });
       });
 
       for (const group of newDesignerGroups.values()) {
-        const existingSinglesFiles = findSinglesFiles(group.destinationName);
-        const totalCount = existingSinglesFiles.length + group.files.length;
+        const existingSingles =
+          findSinglesFiles(group.destinationName);
+
+        const totalCount =
+          existingSingles.length + group.files.length;
 
         if (totalCount >= 3) {
-          existingSinglesFiles.forEach((fileName) => {
+          existingSingles.forEach((fileName) => {
             movePlans.push({
               sourceDirectory: singlesDirectory,
               sourceName: fileName,
@@ -1617,7 +1877,9 @@
           plan.targetDirectory =
             await libraryDirectoryHandle.getDirectoryHandle(
               plan.targetFolderName,
-              { create: plan.targetType === "newDesignerFolder" }
+              {
+                create: plan.targetType === "newDesignerFolder"
+              }
             );
         }
       }
@@ -1641,34 +1903,30 @@
     }
 
     function removeSinglesDesignerPrefix(fileName, destinationName) {
-      const expectedPrefix = `${destinationName}_`;
+      const prefix = `${destinationName}_`;
 
-      if (normalizeText(fileName).startsWith(normalizeText(expectedPrefix))) {
-        return fileName.slice(expectedPrefix.length);
-      }
-
-      return fileName;
+      return normalizeText(fileName).startsWith(normalizeText(prefix))
+        ? fileName.slice(prefix.length)
+        : fileName;
     }
 
-    async function validateMovePlans(movePlans) {
+    async function validateMovePlans(plans) {
       const destinationPaths = new Set();
 
-      for (const plan of movePlans) {
-        const destinationKey =
+      for (const plan of plans) {
+        const key =
           normalizeText(`${plan.targetFolderName}/${plan.targetName}`);
 
-        if (destinationPaths.has(destinationKey)) {
+        if (destinationPaths.has(key)) {
           throw new Error(
             `같은 위치에 같은 파일명이 두 번 생성됩니다: ${plan.targetFolderName}/${plan.targetName}`
           );
         }
 
-        destinationPaths.add(destinationKey);
+        destinationPaths.add(key);
 
-        const alreadyExists = await fileExists(
-          plan.targetDirectory,
-          plan.targetName
-        );
+        const alreadyExists =
+          await fileExists(plan.targetDirectory, plan.targetName);
 
         if (alreadyExists) {
           throw new Error(
@@ -1692,29 +1950,29 @@
     }
 
     async function copyFileThenRemoveOriginal(plan) {
-      const sourceFileHandle =
+      const sourceHandle =
         await plan.sourceDirectory.getFileHandle(plan.sourceName);
 
-      const sourceFile = await sourceFileHandle.getFile();
-      let newFileCreated = false;
+      const sourceFile = await sourceHandle.getFile();
+      let created = false;
 
       try {
-        const targetFileHandle =
+        const targetHandle =
           await plan.targetDirectory.getFileHandle(
             plan.targetName,
             { create: true }
           );
 
-        newFileCreated = true;
+        created = true;
 
-        const writable = await targetFileHandle.createWritable();
+        const writable = await targetHandle.createWritable();
         await writable.write(sourceFile);
         await writable.close();
 
         await plan.sourceDirectory.removeEntry(plan.sourceName);
 
       } catch (error) {
-        if (newFileCreated) {
+        if (created) {
           try {
             await plan.targetDirectory.removeEntry(plan.targetName);
           } catch (cleanupError) {
@@ -1738,7 +1996,11 @@
         }
       }
 
-      downloadFiles.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+      downloadFiles.sort((a, b) =>
+        a.name.localeCompare(b.name, "ko")
+      );
+
+      applyRememberedConnectionsToEmptyFiles();
 
       duplicateCheckComplete = false;
       digestCache = new Map();
@@ -1767,7 +2029,9 @@
         }
       }
 
-      designerFolders.sort((a, b) => a.localeCompare(b, "ko"));
+      designerFolders.sort((a, b) =>
+        a.localeCompare(b, "ko")
+      );
 
       if (singlesDirectoryHandle) {
         for await (const entry of singlesDirectoryHandle.values()) {
@@ -1779,7 +2043,9 @@
           }
         }
 
-        singlesPdfNames.sort((a, b) => a.localeCompare(b, "ko"));
+        singlesPdfNames.sort((a, b) =>
+          a.localeCompare(b, "ko")
+        );
 
         singlesFileCount.textContent =
           `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
@@ -1792,6 +2058,8 @@
         `디자이너 폴더 ${designerFolders.length}개`;
 
       designerSearch.disabled = false;
+
+      renderAliasList();
     }
   </script>
 </body>
