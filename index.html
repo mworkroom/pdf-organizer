@@ -4,86 +4,190 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
+
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      max-width: 850px;
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      max-width: 1100px;
       margin: 40px auto;
-      padding: 0 20px;
+      padding: 0 24px 60px;
       background: #faf9f7;
       color: #222;
     }
 
     h1 {
       margin-bottom: 8px;
+      font-size: 30px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
     }
 
     .description {
       color: #666;
-      margin-bottom: 28px;
+      margin: 0 0 30px;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid #e6e1da;
+      border-radius: 16px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 12px;
     }
 
     button {
       border: none;
       border-radius: 10px;
-      padding: 12px 18px;
-      font-size: 15px;
+      padding: 11px 17px;
+      font-size: 14px;
       cursor: pointer;
       background: #243447;
       color: white;
+      white-space: nowrap;
     }
 
     button:hover {
       background: #34495e;
     }
 
-    #folderName {
-      margin: 20px 0 10px;
+    .folder-info {
+      margin: 14px 0 4px;
       font-weight: bold;
     }
 
-    #fileCount {
+    .count {
       color: #666;
-      margin-bottom: 16px;
-    }
-
-    .file-item {
-      background: white;
-      border: 1px solid #e5e1dc;
-      border-radius: 10px;
-      padding: 12px 14px;
-      margin-bottom: 8px;
+      font-size: 14px;
+      margin-bottom: 14px;
     }
 
     .empty {
       color: #888;
-      margin-top: 20px;
+      margin-top: 18px;
+      font-size: 14px;
+    }
+
+    .file-item,
+    .designer-item {
+      background: #faf9f7;
+      border: 1px solid #ece7e1;
+      border-radius: 9px;
+      padding: 10px 12px;
+      margin-bottom: 7px;
+      font-size: 14px;
+    }
+
+    .search-box {
+      width: 100%;
+      border: 1px solid #d9d3cc;
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 14px;
+      margin: 8px 0 15px;
+    }
+
+    .search-box:focus {
+      outline: 2px solid #243447;
+      border-color: transparent;
+    }
+
+    .list {
+      max-height: 390px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .note {
+      color: #777;
+      font-size: 13px;
+      margin: 6px 0 0;
+    }
+
+    .status {
+      display: inline-block;
+      background: #f0ece6;
+      color: #555;
+      border-radius: 20px;
+      padding: 5px 10px;
+      font-size: 13px;
+      margin-top: 8px;
     }
   </style>
 </head>
 
 <body>
   <h1>PDF Organizer</h1>
-  <p class="description">새로 다운로드한 PDF 폴더를 선택하세요.</p>
+  <p class="description">다운로드된 PDF와 기존 디자이너 폴더를 불러옵니다.</p>
 
-  <button id="selectFolderButton">다운로드 폴더 선택</button>
+  <section class="panel">
+    <div class="panel-header">
+      <h2>1. 새 다운로드 폴더</h2>
+      <button id="selectDownloadFolderButton">다운로드 폴더 선택</button>
+    </div>
 
-  <div id="folderName"></div>
-  <div id="fileCount"></div>
-  <div id="fileList"></div>
+    <div id="downloadFolderName" class="folder-info"></div>
+    <div id="downloadFileCount" class="count"></div>
+    <div id="downloadFileList" class="list"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>2. 기존 패턴 폴더</h2>
+        <p class="note">!로 시작하는 관리용 폴더는 디자이너 목록에서 자동 제외합니다.</p>
+      </div>
+      <button id="selectLibraryFolderButton">패턴 폴더 선택</button>
+    </div>
+
+    <div id="libraryFolderName" class="folder-info"></div>
+    <div id="designerFolderCount" class="count"></div>
+
+    <input
+      type="text"
+      id="designerSearch"
+      class="search-box"
+      placeholder="디자이너 폴더 검색: Knitree, 마요, Lauren..."
+      disabled
+    >
+
+    <div id="designerFolderList" class="list"></div>
+  </section>
 
   <script>
-    const selectFolderButton = document.getElementById("selectFolderButton");
-    const folderName = document.getElementById("folderName");
-    const fileCount = document.getElementById("fileCount");
-    const fileList = document.getElementById("fileList");
+    const selectDownloadFolderButton = document.getElementById("selectDownloadFolderButton");
+    const downloadFolderName = document.getElementById("downloadFolderName");
+    const downloadFileCount = document.getElementById("downloadFileCount");
+    const downloadFileList = document.getElementById("downloadFileList");
 
-    selectFolderButton.addEventListener("click", async () => {
+    const selectLibraryFolderButton = document.getElementById("selectLibraryFolderButton");
+    const libraryFolderName = document.getElementById("libraryFolderName");
+    const designerFolderCount = document.getElementById("designerFolderCount");
+    const designerSearch = document.getElementById("designerSearch");
+    const designerFolderList = document.getElementById("designerFolderList");
+
+    let designerFolders = [];
+
+    selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         const directoryHandle = await window.showDirectoryPicker();
 
-        folderName.textContent = `선택한 폴더: ${directoryHandle.name}`;
-        fileList.innerHTML = "";
+        downloadFolderName.textContent = `선택한 폴더: ${directoryHandle.name}`;
+        downloadFileList.innerHTML = "";
 
         const pdfFiles = [];
 
@@ -96,12 +200,12 @@
           }
         }
 
-        pdfFiles.sort((a, b) => a.localeCompare(b));
+        pdfFiles.sort((a, b) => a.localeCompare(b, "ko"));
 
-        fileCount.textContent = `PDF 파일 ${pdfFiles.length}개`;
+        downloadFileCount.textContent = `PDF 파일 ${pdfFiles.length}개`;
 
         if (pdfFiles.length === 0) {
-          fileList.innerHTML = `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
+          downloadFileList.innerHTML = `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
           return;
         }
 
@@ -109,16 +213,76 @@
           const item = document.createElement("div");
           item.className = "file-item";
           item.textContent = fileName;
-          fileList.appendChild(item);
+          downloadFileList.appendChild(item);
         });
 
       } catch (error) {
         if (error.name !== "AbortError") {
-          alert("폴더를 읽는 중 오류가 발생했습니다.");
+          alert("다운로드 폴더를 읽는 중 오류가 발생했습니다.");
           console.error(error);
         }
       }
     });
+
+    selectLibraryFolderButton.addEventListener("click", async () => {
+      try {
+        const directoryHandle = await window.showDirectoryPicker();
+
+        libraryFolderName.textContent = `선택한 폴더: ${directoryHandle.name}`;
+        designerFolderList.innerHTML = "";
+        designerSearch.value = "";
+
+        designerFolders = [];
+
+        for await (const entry of directoryHandle.values()) {
+          if (
+            entry.kind === "directory" &&
+            !entry.name.startsWith("!")
+          ) {
+            designerFolders.push(entry.name);
+          }
+        }
+
+        designerFolders.sort((a, b) => a.localeCompare(b, "ko"));
+
+        designerFolderCount.textContent = `디자이너 폴더 ${designerFolders.length}개`;
+        designerSearch.disabled = false;
+
+        renderDesignerFolders(designerFolders);
+
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          alert("기존 패턴 폴더를 읽는 중 오류가 발생했습니다.");
+          console.error(error);
+        }
+      }
+    });
+
+    designerSearch.addEventListener("input", () => {
+      const keyword = designerSearch.value.trim().toLowerCase();
+
+      const filteredFolders = designerFolders.filter((folderName) =>
+        folderName.toLowerCase().includes(keyword)
+      );
+
+      renderDesignerFolders(filteredFolders);
+    });
+
+    function renderDesignerFolders(folders) {
+      designerFolderList.innerHTML = "";
+
+      if (folders.length === 0) {
+        designerFolderList.innerHTML = `<p class="empty">검색 결과가 없습니다.</p>`;
+        return;
+      }
+
+      folders.forEach((folderName) => {
+        const item = document.createElement("div");
+        item.className = "designer-item";
+        item.textContent = folderName;
+        designerFolderList.appendChild(item);
+      });
+    }
   </script>
 </body>
 </html>
