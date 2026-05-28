@@ -69,6 +69,11 @@
       background: #34495e;
     }
 
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+
     .secondary-button {
       background: #ede8e1;
       color: #333;
@@ -273,6 +278,39 @@
       border: 1px solid #d5e5d8;
     }
 
+    .execute-area {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #ece7e1;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .execute-button {
+      background: #1e4d3b;
+      padding: 13px 22px;
+      font-size: 15px;
+    }
+
+    .execute-button:hover {
+      background: #28664e;
+    }
+
+    .execute-button:disabled {
+      background: #b8b1a9;
+    }
+
+    .execute-status {
+      font-size: 14px;
+      color: #1e4d3b;
+      line-height: 1.5;
+    }
+
+    .execute-status.error {
+      color: #9b2c2c;
+    }
+
     @media (max-width: 800px) {
       .sort-grid {
         grid-template-columns: 1fr;
@@ -283,6 +321,14 @@
       }
 
       .panel-header button {
+        margin-top: 12px;
+      }
+
+      .execute-area {
+        display: block;
+      }
+
+      .execute-status {
         margin-top: 12px;
       }
     }
@@ -335,7 +381,7 @@
     <h2>3. 새 PDF 정리 미리보기</h2>
     <p class="note">
       기존 폴더를 선택하거나 새 저장 기준 이름을 입력하세요.
-      아직 실제 파일은 이동하지 않습니다.
+      파일명 속 디자이너 표기를 입력하면 패턴 파일명을 자동 정리합니다.
     </p>
 
     <div class="rule-box">
@@ -348,6 +394,11 @@
     </div>
 
     <div id="sortingList" style="margin-top: 18px;"></div>
+
+    <div class="execute-area">
+      <button id="executeButton" class="execute-button">정리 실행</button>
+      <div id="executeStatus" class="execute-status"></div>
+    </div>
   </section>
 
   <script>
@@ -367,9 +418,13 @@
 
     const sortingPanel = document.getElementById("sortingPanel");
     const sortingList = document.getElementById("sortingList");
+    const executeButton = document.getElementById("executeButton");
+    const executeStatus = document.getElementById("executeStatus");
 
     let downloadDirectoryHandle = null;
     let libraryDirectoryHandle = null;
+    let singlesDirectoryHandle = null;
+
     let downloadFiles = [];
     let designerFolders = [];
     let singlesPdfNames = [];
@@ -379,6 +434,9 @@
         downloadDirectoryHandle = await window.showDirectoryPicker();
 
         downloadFolderName.textContent = `선택한 폴더: ${downloadDirectoryHandle.name}`;
+        executeStatus.textContent = "";
+        executeStatus.className = "execute-status";
+
         downloadFiles = [];
 
         for await (const entry of downloadDirectoryHandle.values()) {
@@ -417,12 +475,13 @@
         libraryDirectoryHandle = await window.showDirectoryPicker();
 
         libraryFolderName.textContent = `선택한 폴더: ${libraryDirectoryHandle.name}`;
+        executeStatus.textContent = "";
+        executeStatus.className = "execute-status";
         designerSearch.value = "";
 
         designerFolders = [];
         singlesPdfNames = [];
-
-        let singlesDirectoryHandle = null;
+        singlesDirectoryHandle = null;
 
         for await (const entry of libraryDirectoryHandle.values()) {
           if (entry.kind !== "directory") {
@@ -452,9 +511,11 @@
           }
 
           singlesPdfNames.sort((a, b) => a.localeCompare(b, "ko"));
-          singlesFileCount.textContent = `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
+          singlesFileCount.textContent =
+            `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
         } else {
-          singlesFileCount.textContent = `${SINGLES_FOLDER_NAME} 폴더를 찾지 못했습니다.`;
+          singlesFileCount.textContent =
+            `${SINGLES_FOLDER_NAME} 폴더 없음 — 정리 실행 시 새로 생성됩니다.`;
         }
 
         designerFolderCount.textContent = `디자이너 폴더 ${designerFolders.length}개`;
@@ -472,10 +533,10 @@
     });
 
     designerSearch.addEventListener("input", () => {
-      const keyword = designerSearch.value.trim().toLowerCase();
+      const keyword = normalizeText(designerSearch.value);
 
       const filteredFolders = designerFolders.filter((folderName) =>
-        folderName.toLowerCase().includes(keyword)
+        normalizeText(folderName).includes(keyword)
       );
 
       renderDesignerFolders(filteredFolders);
@@ -486,7 +547,8 @@
       downloadFileCount.textContent = `PDF 파일 ${downloadFiles.length}개`;
 
       if (downloadFiles.length === 0) {
-        downloadFileList.innerHTML = `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
+        downloadFileList.innerHTML =
+          `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
         sortingPanel.classList.add("hidden");
         return;
       }
@@ -503,7 +565,8 @@
       designerFolderList.innerHTML = "";
 
       if (folders.length === 0) {
-        designerFolderList.innerHTML = `<p class="empty">검색 결과가 없습니다.</p>`;
+        designerFolderList.innerHTML =
+          `<p class="empty">검색 결과가 없습니다.</p>`;
         return;
       }
 
@@ -578,7 +641,8 @@
 
         const sourceDesignerHint = document.createElement("div");
         sourceDesignerHint.className = "field-hint";
-        sourceDesignerHint.textContent = "원본 파일명에서 제거할 이름입니다. 저장 폴더명과 달라도 됩니다.";
+        sourceDesignerHint.textContent =
+          "원본 파일명에서 제거할 이름입니다. 저장 폴더명과 달라도 됩니다.";
 
         sourceDesignerField.appendChild(sourceDesignerLabel);
         sourceDesignerField.appendChild(sourceDesignerInput);
@@ -711,7 +775,7 @@
       container.innerHTML = "";
 
       const searchTerm = file.destinationName.trim();
-      const keyword = searchTerm.toLowerCase();
+      const keyword = normalizeText(searchTerm);
 
       if (!keyword || designerFolders.length === 0) {
         return;
@@ -719,14 +783,15 @@
 
       const matches = designerFolders
         .filter((folderName) =>
-          folderName.toLowerCase().includes(keyword)
+          normalizeText(folderName).includes(keyword)
         )
         .slice(0, 8);
 
       if (matches.length === 0) {
         const noMatch = document.createElement("div");
         noMatch.className = "no-match";
-        noMatch.textContent = "기존 폴더 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
+        noMatch.textContent =
+          "기존 폴더 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
         container.appendChild(noMatch);
         return;
       }
@@ -892,6 +957,328 @@
 
     function escapeRegExp(text) {
       return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    executeButton.addEventListener("click", async () => {
+      executeStatus.className = "execute-status";
+      executeStatus.textContent = "";
+
+      if (!downloadDirectoryHandle || !libraryDirectoryHandle) {
+        alert("다운로드 폴더와 기존 패턴 폴더를 먼저 선택하세요.");
+        return;
+      }
+
+      if (downloadFiles.length === 0) {
+        alert("정리할 PDF 파일이 없습니다.");
+        return;
+      }
+
+      const incompleteFiles = downloadFiles.filter((file) => {
+        return (
+          !file.destinationName.trim() ||
+          !ensurePdfExtension(file.patternFileName.trim())
+        );
+      });
+
+      if (incompleteFiles.length > 0) {
+        alert("저장 기준 이름 또는 패턴 파일명이 비어 있는 파일이 있습니다.");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        "실제 파일을 이동하고 이름을 변경합니다.\n\n테스트용 복사 폴더에서 실행 중인지 확인했나요?"
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      executeButton.disabled = true;
+      executeStatus.textContent = "파일을 정리하는 중입니다...";
+
+      try {
+        const plans = await buildExecutionPlans();
+
+        await validateExecutionPlans(plans);
+
+        for (const plan of plans) {
+          await copyFileThenRemoveOriginal(plan);
+        }
+
+        executeStatus.textContent =
+          `정리 완료: PDF 파일 ${plans.length}개를 이동했습니다.`;
+
+        await reloadLibraryData();
+        await reloadDownloadData();
+
+      } catch (error) {
+        console.error(error);
+        executeStatus.className = "execute-status error";
+        executeStatus.textContent = `실행 실패: ${error.message}`;
+        alert(`정리 실행 중 오류가 발생했습니다.\n\n${error.message}`);
+      } finally {
+        executeButton.disabled = false;
+      }
+    });
+
+    async function buildExecutionPlans() {
+      const plans = [];
+      const newDesignerGroups = new Map();
+      const singlesDirectory = await getOrCreateSinglesDirectory();
+
+      for (const file of downloadFiles) {
+        const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+
+        if (file.selectedFolder) {
+          const targetDirectory =
+            await libraryDirectoryHandle.getDirectoryHandle(file.selectedFolder);
+
+          plans.push({
+            sourceDirectory: downloadDirectoryHandle,
+            sourceName: file.name,
+            targetDirectory,
+            targetFolderName: file.selectedFolder,
+            targetName: patternFileName
+          });
+
+          continue;
+        }
+
+        const destinationName = file.destinationName.trim();
+        const groupKey = normalizeText(destinationName);
+
+        if (!newDesignerGroups.has(groupKey)) {
+          newDesignerGroups.set(groupKey, {
+            destinationName,
+            files: []
+          });
+        }
+
+        newDesignerGroups.get(groupKey).files.push({
+          sourceFile: file,
+          patternFileName
+        });
+      }
+
+      for (const group of newDesignerGroups.values()) {
+        const existingSinglesFiles = findSinglesFiles(group.destinationName);
+        const totalCount = existingSinglesFiles.length + group.files.length;
+
+        if (totalCount >= 3) {
+          const targetDirectory =
+            await libraryDirectoryHandle.getDirectoryHandle(
+              group.destinationName,
+              { create: true }
+            );
+
+          existingSinglesFiles.forEach((fileName) => {
+            plans.push({
+              sourceDirectory: singlesDirectory,
+              sourceName: fileName,
+              targetDirectory,
+              targetFolderName: group.destinationName,
+              targetName: removeSinglesDesignerPrefix(
+                fileName,
+                group.destinationName
+              )
+            });
+          });
+
+          group.files.forEach(({ sourceFile, patternFileName }) => {
+            plans.push({
+              sourceDirectory: downloadDirectoryHandle,
+              sourceName: sourceFile.name,
+              targetDirectory,
+              targetFolderName: group.destinationName,
+              targetName: patternFileName
+            });
+          });
+
+          continue;
+        }
+
+        group.files.forEach(({ sourceFile, patternFileName }) => {
+          plans.push({
+            sourceDirectory: downloadDirectoryHandle,
+            sourceName: sourceFile.name,
+            targetDirectory: singlesDirectory,
+            targetFolderName: SINGLES_FOLDER_NAME,
+            targetName: `${group.destinationName}_${patternFileName}`
+          });
+        });
+      }
+
+      return plans;
+    }
+
+    async function getOrCreateSinglesDirectory() {
+      if (!singlesDirectoryHandle) {
+        singlesDirectoryHandle =
+          await libraryDirectoryHandle.getDirectoryHandle(
+            SINGLES_FOLDER_NAME,
+            { create: true }
+          );
+      }
+
+      return singlesDirectoryHandle;
+    }
+
+    function removeSinglesDesignerPrefix(fileName, destinationName) {
+      const expectedPrefix = `${destinationName}_`;
+
+      if (normalizeText(fileName).startsWith(normalizeText(expectedPrefix))) {
+        return fileName.slice(expectedPrefix.length);
+      }
+
+      return fileName;
+    }
+
+    async function validateExecutionPlans(plans) {
+      const destinationPaths = new Set();
+
+      for (const plan of plans) {
+        const destinationKey =
+          normalizeText(`${plan.targetFolderName}/${plan.targetName}`);
+
+        if (destinationPaths.has(destinationKey)) {
+          throw new Error(
+            `같은 위치에 같은 파일명이 두 번 생성됩니다: ${plan.targetFolderName}/${plan.targetName}`
+          );
+        }
+
+        destinationPaths.add(destinationKey);
+
+        const alreadyExists = await fileExists(
+          plan.targetDirectory,
+          plan.targetName
+        );
+
+        if (alreadyExists) {
+          throw new Error(
+            `같은 이름의 파일이 이미 있습니다: ${plan.targetFolderName}/${plan.targetName}`
+          );
+        }
+      }
+    }
+
+    async function fileExists(directoryHandle, fileName) {
+      try {
+        await directoryHandle.getFileHandle(fileName);
+        return true;
+      } catch (error) {
+        if (error.name === "NotFoundError") {
+          return false;
+        }
+
+        throw error;
+      }
+    }
+
+    async function copyFileThenRemoveOriginal(plan) {
+      const sourceFileHandle =
+        await plan.sourceDirectory.getFileHandle(plan.sourceName);
+
+      const sourceFile = await sourceFileHandle.getFile();
+      let newFileCreated = false;
+
+      try {
+        const targetFileHandle =
+          await plan.targetDirectory.getFileHandle(
+            plan.targetName,
+            { create: true }
+          );
+
+        newFileCreated = true;
+
+        const writable = await targetFileHandle.createWritable();
+        await writable.write(sourceFile);
+        await writable.close();
+
+        await plan.sourceDirectory.removeEntry(plan.sourceName);
+
+      } catch (error) {
+        if (newFileCreated) {
+          try {
+            await plan.targetDirectory.removeEntry(plan.targetName);
+          } catch (cleanupError) {
+            console.error("생성된 파일 정리 실패:", cleanupError);
+          }
+        }
+
+        throw error;
+      }
+    }
+
+    async function reloadDownloadData() {
+      downloadFiles = [];
+
+      for await (const entry of downloadDirectoryHandle.values()) {
+        if (
+          entry.kind === "file" &&
+          entry.name.toLowerCase().endsWith(".pdf")
+        ) {
+          downloadFiles.push({
+            name: entry.name,
+            handle: entry,
+            destinationName: "",
+            selectedFolder: null,
+            sourceDesignerName: "",
+            patternFileName: entry.name,
+            patternManuallyEdited: false,
+            previewElement: null
+          });
+        }
+      }
+
+      downloadFiles.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+
+      renderDownloadFileList();
+      renderSortingRows();
+    }
+
+    async function reloadLibraryData() {
+      designerFolders = [];
+      singlesPdfNames = [];
+      singlesDirectoryHandle = null;
+
+      for await (const entry of libraryDirectoryHandle.values()) {
+        if (entry.kind !== "directory") {
+          continue;
+        }
+
+        if (entry.name === SINGLES_FOLDER_NAME) {
+          singlesDirectoryHandle = entry;
+          continue;
+        }
+
+        if (!entry.name.startsWith("!")) {
+          designerFolders.push(entry.name);
+        }
+      }
+
+      designerFolders.sort((a, b) => a.localeCompare(b, "ko"));
+
+      if (singlesDirectoryHandle) {
+        for await (const entry of singlesDirectoryHandle.values()) {
+          if (
+            entry.kind === "file" &&
+            entry.name.toLowerCase().endsWith(".pdf")
+          ) {
+            singlesPdfNames.push(entry.name);
+          }
+        }
+
+        singlesPdfNames.sort((a, b) => a.localeCompare(b, "ko"));
+
+        singlesFileCount.textContent =
+          `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
+      } else {
+        singlesFileCount.textContent =
+          `${SINGLES_FOLDER_NAME} 폴더 없음 — 정리 실행 시 새로 생성됩니다.`;
+      }
+
+      designerFolderCount.textContent = `디자이너 폴더 ${designerFolders.length}개`;
+      renderDesignerFolders(designerFolders);
     }
   </script>
 </body>
