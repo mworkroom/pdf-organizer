@@ -89,6 +89,12 @@
     .count {
       color: #666;
       font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .singles-status {
+      font-size: 14px;
+      color: #694a12;
       margin-bottom: 14px;
     }
 
@@ -141,6 +147,16 @@
       line-height: 1.55;
     }
 
+    .rule-box {
+      margin-top: 16px;
+      background: #faf9f7;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #666;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
     .sort-row {
       border: 1px solid #e6e1da;
       border-radius: 14px;
@@ -153,7 +169,6 @@
       font-weight: bold;
       margin-bottom: 16px;
       word-break: break-all;
-      color: #222;
     }
 
     .sort-grid {
@@ -233,9 +248,11 @@
       background: #f5f2ee;
       border-radius: 9px;
       padding: 12px 13px;
-      min-height: 44px;
+      min-height: 48px;
       font-size: 14px;
       word-break: break-all;
+      white-space: pre-line;
+      line-height: 1.6;
     }
 
     .preview.pending {
@@ -250,14 +267,10 @@
       color: #694a12;
     }
 
-    .rule-box {
-      margin-top: 16px;
-      background: #faf9f7;
-      border-radius: 10px;
-      padding: 12px 14px;
-      color: #666;
-      font-size: 13px;
-      line-height: 1.7;
+    .preview.promote {
+      background: #eef4ef;
+      color: #1e4d3b;
+      border: 1px solid #d5e5d8;
     }
 
     @media (max-width: 800px) {
@@ -278,7 +291,7 @@
 
 <body>
   <h1>PDF Organizer</h1>
-  <p class="description">다운로드된 PDF와 기존 디자이너 폴더를 연결하고 파일명을 정리합니다.</p>
+  <p class="description">다운로드된 PDF를 기존 폴더 또는 !zz_Singles 기준으로 정리합니다.</p>
 
   <section class="panel">
     <div class="panel-header">
@@ -295,13 +308,17 @@
     <div class="panel-header">
       <div>
         <h2>2. 기존 패턴 폴더</h2>
-        <p class="note">!로 시작하는 관리용 폴더는 디자이너 목록에서 자동 제외합니다.</p>
+        <p class="note">
+          !로 시작하는 관리용 폴더는 디자이너 목록에서 제외합니다.
+          단, !zz_Singles 안의 PDF는 세 번째 패턴 판별에 사용합니다.
+        </p>
       </div>
       <button id="selectLibraryFolderButton">패턴 폴더 선택</button>
     </div>
 
     <div id="libraryFolderName" class="folder-info"></div>
     <div id="designerFolderCount" class="count"></div>
+    <div id="singlesFileCount" class="singles-status"></div>
 
     <input
       type="text"
@@ -318,7 +335,6 @@
     <h2>3. 새 PDF 정리 미리보기</h2>
     <p class="note">
       기존 폴더를 선택하거나 새 저장 기준 이름을 입력하세요.
-      파일명 속 디자이너 표기를 입력하면 패턴 파일명을 자동 정리합니다.
       아직 실제 파일은 이동하지 않습니다.
     </p>
 
@@ -327,13 +343,16 @@
       <strong>Designer_Pattern</strong>,
       <strong>Designer_-_Pattern</strong>,
       <strong>Pattern_Designer</strong>,
-      <strong>Pattern by Designer</strong>
+      <strong>Pattern by Designer</strong><br>
+      새 디자이너의 기존 Singles 파일과 이번 다운로드 파일을 합쳐 3개 이상이면 새 폴더 생성 대상으로 표시합니다.
     </div>
 
     <div id="sortingList" style="margin-top: 18px;"></div>
   </section>
 
   <script>
+    const SINGLES_FOLDER_NAME = "!zz_Singles";
+
     const selectDownloadFolderButton = document.getElementById("selectDownloadFolderButton");
     const downloadFolderName = document.getElementById("downloadFolderName");
     const downloadFileCount = document.getElementById("downloadFileCount");
@@ -342,6 +361,7 @@
     const selectLibraryFolderButton = document.getElementById("selectLibraryFolderButton");
     const libraryFolderName = document.getElementById("libraryFolderName");
     const designerFolderCount = document.getElementById("designerFolderCount");
+    const singlesFileCount = document.getElementById("singlesFileCount");
     const designerSearch = document.getElementById("designerSearch");
     const designerFolderList = document.getElementById("designerFolderList");
 
@@ -352,13 +372,13 @@
     let libraryDirectoryHandle = null;
     let downloadFiles = [];
     let designerFolders = [];
+    let singlesPdfNames = [];
 
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         downloadDirectoryHandle = await window.showDirectoryPicker();
 
         downloadFolderName.textContent = `선택한 폴더: ${downloadDirectoryHandle.name}`;
-        downloadFileList.innerHTML = "";
         downloadFiles = [];
 
         for await (const entry of downloadDirectoryHandle.values()) {
@@ -373,28 +393,15 @@
               selectedFolder: null,
               sourceDesignerName: "",
               patternFileName: entry.name,
-              patternManuallyEdited: false
+              patternManuallyEdited: false,
+              previewElement: null
             });
           }
         }
 
         downloadFiles.sort((a, b) => a.name.localeCompare(b.name, "ko"));
 
-        downloadFileCount.textContent = `PDF 파일 ${downloadFiles.length}개`;
-
-        if (downloadFiles.length === 0) {
-          downloadFileList.innerHTML = `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
-          sortingPanel.classList.add("hidden");
-          return;
-        }
-
-        downloadFiles.forEach((file) => {
-          const item = document.createElement("div");
-          item.className = "file-item";
-          item.textContent = file.name;
-          downloadFileList.appendChild(item);
-        });
-
+        renderDownloadFileList();
         renderSortingRows();
 
       } catch (error) {
@@ -410,20 +417,45 @@
         libraryDirectoryHandle = await window.showDirectoryPicker();
 
         libraryFolderName.textContent = `선택한 폴더: ${libraryDirectoryHandle.name}`;
-        designerFolderList.innerHTML = "";
         designerSearch.value = "";
+
         designerFolders = [];
+        singlesPdfNames = [];
+
+        let singlesDirectoryHandle = null;
 
         for await (const entry of libraryDirectoryHandle.values()) {
-          if (
-            entry.kind === "directory" &&
-            !entry.name.startsWith("!")
-          ) {
+          if (entry.kind !== "directory") {
+            continue;
+          }
+
+          if (entry.name === SINGLES_FOLDER_NAME) {
+            singlesDirectoryHandle = entry;
+            continue;
+          }
+
+          if (!entry.name.startsWith("!")) {
             designerFolders.push(entry.name);
           }
         }
 
         designerFolders.sort((a, b) => a.localeCompare(b, "ko"));
+
+        if (singlesDirectoryHandle) {
+          for await (const entry of singlesDirectoryHandle.values()) {
+            if (
+              entry.kind === "file" &&
+              entry.name.toLowerCase().endsWith(".pdf")
+            ) {
+              singlesPdfNames.push(entry.name);
+            }
+          }
+
+          singlesPdfNames.sort((a, b) => a.localeCompare(b, "ko"));
+          singlesFileCount.textContent = `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
+        } else {
+          singlesFileCount.textContent = `${SINGLES_FOLDER_NAME} 폴더를 찾지 못했습니다.`;
+        }
 
         designerFolderCount.textContent = `디자이너 폴더 ${designerFolders.length}개`;
         designerSearch.disabled = false;
@@ -448,6 +480,24 @@
 
       renderDesignerFolders(filteredFolders);
     });
+
+    function renderDownloadFileList() {
+      downloadFileList.innerHTML = "";
+      downloadFileCount.textContent = `PDF 파일 ${downloadFiles.length}개`;
+
+      if (downloadFiles.length === 0) {
+        downloadFileList.innerHTML = `<p class="empty">이 폴더에 PDF 파일이 없습니다.</p>`;
+        sortingPanel.classList.add("hidden");
+        return;
+      }
+
+      downloadFiles.forEach((file) => {
+        const item = document.createElement("div");
+        item.className = "file-item";
+        item.textContent = file.name;
+        downloadFileList.appendChild(item);
+      });
+    }
 
     function renderDesignerFolders(folders) {
       designerFolderList.innerHTML = "";
@@ -566,6 +616,8 @@
         const preview = document.createElement("div");
         preview.className = "preview pending";
 
+        file.previewElement = preview;
+
         previewField.appendChild(previewLabel);
         previewField.appendChild(preview);
 
@@ -589,11 +641,10 @@
             destinationInput,
             sourceDesignerInput,
             patternInput,
-            selectedLabel,
-            preview
+            selectedLabel
           );
 
-          updatePreview(file, preview);
+          updateAllPreviews();
         });
 
         destinationInput.addEventListener("focus", () => {
@@ -603,8 +654,7 @@
             destinationInput,
             sourceDesignerInput,
             patternInput,
-            selectedLabel,
-            preview
+            selectedLabel
           );
         });
 
@@ -619,20 +669,20 @@
             patternInput.value = file.patternFileName;
           }
 
-          updatePreview(file, preview);
+          updateAllPreviews();
         });
 
         patternInput.addEventListener("input", () => {
-          file.patternFileName = ensurePdfExtension(patternInput.value.trim());
+          file.patternFileName = patternInput.value.trim();
           file.patternManuallyEdited = true;
-          updatePreview(file, preview);
+          updateAllPreviews();
         });
 
         patternInput.addEventListener("blur", () => {
           if (patternInput.value.trim()) {
             file.patternFileName = ensurePdfExtension(patternInput.value.trim());
             patternInput.value = file.patternFileName;
-            updatePreview(file, preview);
+            updateAllPreviews();
           }
         });
 
@@ -643,11 +693,11 @@
             file.sourceDesignerName
           );
           patternInput.value = file.patternFileName;
-          updatePreview(file, preview);
+          updateAllPreviews();
         });
-
-        updatePreview(file, preview);
       });
+
+      updateAllPreviews();
     }
 
     function renderSuggestions(
@@ -656,8 +706,7 @@
       destinationInput,
       sourceDesignerInput,
       patternInput,
-      selectedLabel,
-      preview
+      selectedLabel
     ) {
       container.innerHTML = "";
 
@@ -677,7 +726,7 @@
       if (matches.length === 0) {
         const noMatch = document.createElement("div");
         noMatch.className = "no-match";
-        noMatch.textContent = "기존 폴더 없음 — 이 이름으로 !zz_Singles에 저장됩니다.";
+        noMatch.textContent = "기존 폴더 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
         container.appendChild(noMatch);
         return;
       }
@@ -713,13 +762,79 @@
             }
           }
 
-          updatePreview(file, preview);
+          updateAllPreviews();
         });
 
         suggestionBox.appendChild(button);
       });
 
       container.appendChild(suggestionBox);
+    }
+
+    function updateAllPreviews() {
+      downloadFiles.forEach((file) => {
+        updatePreview(file);
+      });
+    }
+
+    function updatePreview(file) {
+      const preview = file.previewElement;
+
+      if (!preview) {
+        return;
+      }
+
+      preview.className = "preview";
+
+      const destinationName = file.destinationName.trim();
+      const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+
+      if (!destinationName || !patternFileName) {
+        preview.classList.add("pending");
+        preview.textContent = "저장 기준 이름과 패턴 파일명을 입력하세요.";
+        return;
+      }
+
+      if (file.selectedFolder) {
+        preview.classList.add("existing");
+        preview.textContent = `${file.selectedFolder}/${patternFileName}`;
+        return;
+      }
+
+      const existingSingles = findSinglesFiles(destinationName);
+      const incomingFiles = findIncomingFilesForDesigner(destinationName);
+      const totalCount = existingSingles.length + incomingFiles.length;
+
+      if (totalCount >= 3) {
+        preview.classList.add("promote");
+        preview.textContent =
+          `새 디자이너 폴더 생성 예정: ${destinationName}/\n` +
+          `기존 Singles 파일 ${existingSingles.length}개 + 이번 다운로드 ${incomingFiles.length}개 이동\n` +
+          `→ ${destinationName}/${patternFileName}`;
+        return;
+      }
+
+      preview.classList.add("single");
+      preview.textContent =
+        `${SINGLES_FOLDER_NAME}/${destinationName}_${patternFileName}\n` +
+        `현재 계산: 기존 Singles ${existingSingles.length}개 + 이번 다운로드 ${incomingFiles.length}개 = 총 ${totalCount}개`;
+    }
+
+    function findSinglesFiles(destinationName) {
+      const prefix = normalizeText(`${destinationName}_`);
+
+      return singlesPdfNames.filter((fileName) =>
+        normalizeText(fileName).startsWith(prefix)
+      );
+    }
+
+    function findIncomingFilesForDesigner(destinationName) {
+      const targetName = normalizeText(destinationName);
+
+      return downloadFiles.filter((file) =>
+        !file.selectedFolder &&
+        normalizeText(file.destinationName) === targetName
+      );
     }
 
     function suggestPatternFileName(originalFileName, sourceDesignerName) {
@@ -731,11 +846,6 @@
       }
 
       const escapedDesigner = escapeRegExp(designer);
-
-      /*
-        디자이너명을 정확히 찾은 뒤, 그 앞뒤의 구분자만 제거합니다.
-        따라서 Anna-Sofia처럼 디자이너명 내부에 들어 있는 하이픈은 건드리지 않습니다.
-      */
 
       const designerAtStart = new RegExp(
         `^${escapedDesigner}(?:\\s*[_-]\\s*)+`,
@@ -776,27 +886,12 @@
       return cleaned ? `${cleaned}.pdf` : "";
     }
 
-    function escapeRegExp(text) {
-      return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    function normalizeText(text) {
+      return text.trim().toLocaleLowerCase("ko");
     }
 
-    function updatePreview(file, preview) {
-      preview.className = "preview";
-
-      if (!file.destinationName || !file.patternFileName) {
-        preview.classList.add("pending");
-        preview.textContent = "저장 기준 이름과 패턴 파일명을 입력하세요.";
-        return;
-      }
-
-      if (file.selectedFolder) {
-        preview.classList.add("existing");
-        preview.textContent = `${file.selectedFolder}/${file.patternFileName}`;
-        return;
-      }
-
-      preview.classList.add("single");
-      preview.textContent = `!zz_Singles/${file.destinationName}_${file.patternFileName}`;
+    function escapeRegExp(text) {
+      return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
   </script>
 </body>
