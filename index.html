@@ -180,6 +180,11 @@
       border-color: transparent;
     }
 
+    .text-input:disabled {
+      background: #f3f0eb;
+      color: #999;
+    }
+
     .list {
       max-height: 390px;
       overflow-y: auto;
@@ -245,10 +250,41 @@
       background: #fff;
     }
 
+    .sort-row.excluded {
+      background: #fbfaf8;
+      border-color: #ded9d2;
+    }
+
+    .source-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
     .source-file {
       font-weight: bold;
-      margin-bottom: 16px;
       word-break: break-all;
+      line-height: 1.5;
+    }
+
+    .exclude-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: #555;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .exclude-label input {
+      width: 16px;
+      height: 16px;
+      accent-color: #735c36;
+      cursor: pointer;
     }
 
     .sort-grid {
@@ -354,6 +390,12 @@
       border: 1px solid #d5e5d8;
     }
 
+    .preview.excluded {
+      background: #f2f0ed;
+      color: #666;
+      border: 1px dashed #d2cbc3;
+    }
+
     .row-status {
       margin-top: 10px;
       border-radius: 9px;
@@ -383,6 +425,11 @@
       color: #8b2727;
     }
 
+    .row-status.excluded {
+      background: #f2f0ed;
+      color: #666;
+    }
+
     .execute-area {
       margin-top: 24px;
       padding-top: 20px;
@@ -409,11 +456,16 @@
         grid-template-columns: 1fr;
       }
 
-      .panel-header {
+      .panel-header,
+      .source-header {
         display: block;
       }
 
       .panel-header button {
+        margin-top: 12px;
+      }
+
+      .exclude-label {
         margin-top: 12px;
       }
 
@@ -494,7 +546,7 @@
 
     <p class="note">
       기존 디자이너를 선택하거나 새 저장 기준 이름을 입력하세요.
-      기존 디자이너를 선택한 뒤 ‘이 연결 기억’을 누르면 다음부터 자동 선택됩니다.
+      지금 처리하지 않을 파일은 ‘이번 작업에서 제외’를 체크하면 다운로드 폴더에 그대로 남습니다.
     </p>
 
     <div class="rule-box">
@@ -504,7 +556,8 @@
       <strong>Pattern_Designer</strong>,
       <strong>Pattern by Designer</strong><br>
       완전히 같은 PDF가 이미 저장되어 있으면 파일명이 달라도 다운로드본만 삭제합니다.<br>
-      같은 최종 파일명이 있지만 내용이 다르면 해당 파일만 보류합니다.
+      같은 최종 파일명이 있지만 내용이 다르면 해당 파일만 보류합니다.<br>
+      이번 작업에서 제외한 파일은 중복 검사, 이동, 삭제, 새 폴더 생성 계산에서 모두 제외됩니다.
     </div>
 
     <div id="sortingList" style="margin-top: 18px;"></div>
@@ -610,7 +663,9 @@
         return;
       }
 
-      if (downloadFiles.length === 0) {
+      const activeFiles = downloadFiles.filter((file) => !file.excluded);
+
+      if (activeFiles.length === 0) {
         alert("검사할 PDF 파일이 없습니다.");
         return;
       }
@@ -643,8 +698,12 @@
           (file) => file.analysis.action === "move"
         ).length;
 
+        const excludedCount = downloadFiles.filter(
+          (file) => file.excluded
+        ).length;
+
         executeStatus.textContent =
-          `중복 검사 완료: 이동 ${moveCount}개 / 완전 중복 삭제 ${duplicateCount}개 / 보류 ${holdCount}개`;
+          `중복 검사 완료: 이동 ${moveCount}개 / 완전 중복 삭제 ${duplicateCount}개 / 보류 ${holdCount}개 / 제외 ${excludedCount}개`;
 
       } catch (error) {
         console.error(error);
@@ -665,7 +724,9 @@
         return;
       }
 
-      if (downloadFiles.length === 0) {
+      const activeFiles = downloadFiles.filter((file) => !file.excluded);
+
+      if (activeFiles.length === 0) {
         alert("정리할 PDF 파일이 없습니다.");
         return;
       }
@@ -692,12 +753,16 @@
         (file) => file.analysis.action === "hold"
       ).length;
 
+      const excludedCount = downloadFiles.filter(
+        (file) => file.excluded
+      ).length;
+
       const confirmed = window.confirm(
         `실제 파일 정리를 실행합니다.\n\n` +
         `이동 예정: ${moveCount}개\n` +
         `완전 중복 다운로드본 삭제: ${duplicateCount}개\n` +
-        `보류: ${holdCount}개\n\n` +
-        `테스트용 폴더에서 실행 중인지 확인했나요?`
+        `보류: ${holdCount}개\n` +
+        `이번 작업에서 제외: ${excludedCount}개`
       );
 
       if (!confirmed) {
@@ -722,7 +787,7 @@
         }
 
         executeStatus.textContent =
-          `정리 완료: 이동 ${plans.movePlans.length}개 / 완전 중복 삭제 ${plans.deletePlans.length}개 / 보류 ${holdCount}개`;
+          `정리 완료: 이동 ${plans.movePlans.length}개 / 완전 중복 삭제 ${plans.deletePlans.length}개 / 보류 ${holdCount}개 / 제외 ${excludedCount}개`;
 
         await reloadLibraryData();
         await reloadDownloadData();
@@ -742,6 +807,7 @@
       return {
         name: entry.name,
         handle: entry,
+        excluded: false,
         destinationName: "",
         selectedFolder: null,
         sourceDesignerName: "",
@@ -871,6 +937,7 @@
 
       downloadFiles.forEach((file) => {
         if (
+          file.excluded ||
           file.destinationName.trim() ||
           file.selectedFolder ||
           file.sourceDesignerTouched ||
@@ -935,12 +1002,14 @@
     }
 
     function hasIncompleteFiles() {
-      return downloadFiles.some((file) => {
-        return (
-          !file.destinationName.trim() ||
-          !ensurePdfExtension(file.patternFileName.trim())
-        );
-      });
+      return downloadFiles
+        .filter((file) => !file.excluded)
+        .some((file) => {
+          return (
+            !file.destinationName.trim() ||
+            !ensurePdfExtension(file.patternFileName.trim())
+          );
+        });
     }
 
     function renderDownloadFileList() {
@@ -991,11 +1060,30 @@
 
       downloadFiles.forEach((file) => {
         const row = document.createElement("div");
-        row.className = "sort-row";
+        row.className = file.excluded ? "sort-row excluded" : "sort-row";
+
+        const sourceHeader = document.createElement("div");
+        sourceHeader.className = "source-header";
 
         const sourceFile = document.createElement("div");
         sourceFile.className = "source-file";
         sourceFile.textContent = `원본 파일: ${file.name}`;
+
+        const excludeLabel = document.createElement("label");
+        excludeLabel.className = "exclude-label";
+
+        const excludeCheckbox = document.createElement("input");
+        excludeCheckbox.type = "checkbox";
+        excludeCheckbox.checked = file.excluded;
+
+        const excludeText = document.createElement("span");
+        excludeText.textContent = "이번 작업에서 제외";
+
+        excludeLabel.appendChild(excludeCheckbox);
+        excludeLabel.appendChild(excludeText);
+
+        sourceHeader.appendChild(sourceFile);
+        sourceHeader.appendChild(excludeLabel);
 
         const grid = document.createElement("div");
         grid.className = "sort-grid";
@@ -1013,6 +1101,7 @@
         destinationInput.type = "text";
         destinationInput.placeholder = "예: Knitree, 마요, 나무 Knitree";
         destinationInput.value = file.destinationName;
+        destinationInput.disabled = file.excluded;
 
         const selectedLabel = document.createElement("div");
         selectedLabel.className = "selected-label";
@@ -1042,6 +1131,7 @@
         sourceDesignerInput.type = "text";
         sourceDesignerInput.placeholder = "예: Knitree, Anna-Sofia Vintersol";
         sourceDesignerInput.value = file.sourceDesignerName;
+        sourceDesignerInput.disabled = file.excluded;
 
         const sourceDesignerHint = document.createElement("div");
         sourceDesignerHint.className = "field-hint";
@@ -1052,11 +1142,8 @@
         rememberButton.type = "button";
         rememberButton.className = "secondary-button remember-button";
         rememberButton.textContent = "이 연결 기억";
-        rememberButton.disabled = !getExistingFolderName(file);
-
-        rememberButton.addEventListener("click", () => {
-          rememberConnection(file);
-        });
+        rememberButton.disabled =
+          file.excluded || !getExistingFolderName(file);
 
         sourceDesignerField.appendChild(sourceDesignerLabel);
         sourceDesignerField.appendChild(sourceDesignerInput);
@@ -1075,11 +1162,13 @@
         patternInput.type = "text";
         patternInput.placeholder = "예: summer_top.pdf";
         patternInput.value = file.patternFileName;
+        patternInput.disabled = file.excluded;
 
         const resetButton = document.createElement("button");
         resetButton.type = "button";
         resetButton.className = "secondary-button";
         resetButton.textContent = "자동 정리 다시 적용";
+        resetButton.disabled = file.excluded;
 
         patternField.appendChild(patternLabel);
         patternField.appendChild(patternInput);
@@ -1111,9 +1200,20 @@
         grid.appendChild(patternField);
         grid.appendChild(previewField);
 
-        row.appendChild(sourceFile);
+        row.appendChild(sourceHeader);
         row.appendChild(grid);
         sortingList.appendChild(row);
+
+        excludeCheckbox.addEventListener("change", () => {
+          file.excluded = excludeCheckbox.checked;
+
+          invalidateDuplicateCheck();
+          renderSortingRows();
+        });
+
+        rememberButton.addEventListener("click", () => {
+          rememberConnection(file);
+        });
 
         destinationInput.addEventListener("input", () => {
           file.destinationName = destinationInput.value.trim();
@@ -1215,6 +1315,10 @@
     ) {
       container.innerHTML = "";
 
+      if (file.excluded) {
+        return;
+      }
+
       const searchTerm = file.destinationName.trim();
       const keyword = normalizeText(searchTerm);
 
@@ -1298,6 +1402,13 @@
 
       preview.className = "preview";
 
+      if (file.excluded) {
+        preview.classList.add("excluded");
+        preview.textContent =
+          "이번 작업에서 제외 — 다운로드 폴더에 그대로 남깁니다.";
+        return;
+      }
+
       const destinationName = file.destinationName.trim();
       const patternFileName = ensurePdfExtension(file.patternFileName.trim());
       const existingFolderName = getExistingFolderName(file);
@@ -1350,6 +1461,13 @@
         return;
       }
 
+      if (file.excluded) {
+        status.className = "row-status excluded";
+        status.textContent =
+          "이번 작업에서 제외 — 중복 검사 및 정리 실행 대상이 아닙니다.";
+        return;
+      }
+
       if (!duplicateCheckComplete || file.analysis.action === "unchecked") {
         status.className = "row-status unchecked";
         status.textContent = "중복 검사 전";
@@ -1399,6 +1517,7 @@
       const targetName = normalizeText(destinationName);
 
       return downloadFiles.filter((file) =>
+        !file.excluded &&
         !getExistingFolderName(file) &&
         normalizeText(file.destinationName) === targetName
       );
@@ -1409,7 +1528,7 @@
 
       downloadFiles.forEach((file) => {
         file.analysis = {
-          action: "move",
+          action: file.excluded ? "excluded" : "move",
           message: "",
           matchPath: ""
         };
@@ -1418,35 +1537,37 @@
       const existingFolderGroups = new Map();
       const singlesGroups = new Map();
 
-      downloadFiles.forEach((file) => {
-        const existingFolderName = getExistingFolderName(file);
+      downloadFiles
+        .filter((file) => !file.excluded)
+        .forEach((file) => {
+          const existingFolderName = getExistingFolderName(file);
 
-        if (existingFolderName) {
-          const key = normalizeText(existingFolderName);
+          if (existingFolderName) {
+            const key = normalizeText(existingFolderName);
 
-          if (!existingFolderGroups.has(key)) {
-            existingFolderGroups.set(key, {
-              folderName: existingFolderName,
+            if (!existingFolderGroups.has(key)) {
+              existingFolderGroups.set(key, {
+                folderName: existingFolderName,
+                files: []
+              });
+            }
+
+            existingFolderGroups.get(key).files.push(file);
+            return;
+          }
+
+          const destinationName = file.destinationName.trim();
+          const key = normalizeText(destinationName);
+
+          if (!singlesGroups.has(key)) {
+            singlesGroups.set(key, {
+              destinationName,
               files: []
             });
           }
 
-          existingFolderGroups.get(key).files.push(file);
-          return;
-        }
-
-        const destinationName = file.destinationName.trim();
-        const key = normalizeText(destinationName);
-
-        if (!singlesGroups.has(key)) {
-          singlesGroups.set(key, {
-            destinationName,
-            files: []
-          });
-        }
-
-        singlesGroups.get(key).files.push(file);
-      });
+          singlesGroups.get(key).files.push(file);
+        });
 
       for (const group of existingFolderGroups.values()) {
         await analyseExistingFolderGroup(group);
@@ -1782,6 +1903,10 @@
       const singlesDirectory = await getOrCreateSinglesDirectory();
 
       downloadFiles.forEach((file) => {
+        if (file.excluded) {
+          return;
+        }
+
         if (file.analysis.action === "deleteDuplicate") {
           deletePlans.push({
             sourceDirectory: downloadDirectoryHandle,
