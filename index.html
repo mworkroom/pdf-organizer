@@ -451,13 +451,108 @@
       color: #9b2c2c;
     }
 
+    .log-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .log-list {
+      max-height: 700px;
+      overflow-y: auto;
+      padding-right: 4px;
+      margin-top: 16px;
+    }
+
+    .log-entry {
+      border: 1px solid #e6e1da;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 12px;
+      background: #faf9f7;
+    }
+
+    .log-entry.failed {
+      border-color: #e8cccc;
+      background: #fdf8f8;
+    }
+
+    .log-entry-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .log-result {
+      font-size: 12px;
+      font-weight: normal;
+      padding: 4px 8px;
+      border-radius: 20px;
+      background: #e9f2ec;
+      color: #1e4d3b;
+      flex-shrink: 0;
+    }
+
+    .log-result.failed {
+      background: #f6e5e5;
+      color: #8b2727;
+    }
+
+    .log-summary {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 12px;
+      line-height: 1.55;
+    }
+
+    .log-section {
+      margin-top: 11px;
+    }
+
+    .log-section-title {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 5px;
+      color: #444;
+    }
+
+    .log-section-title.deleted {
+      color: #8b2727;
+    }
+
+    .log-line {
+      font-size: 13px;
+      color: #555;
+      padding: 4px 0;
+      line-height: 1.55;
+      word-break: break-all;
+    }
+
+    .log-line.deleted {
+      color: #8b2727;
+    }
+
+    .log-error {
+      background: #f9eeee;
+      color: #8b2727;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
     @media (max-width: 800px) {
       .sort-grid {
         grid-template-columns: 1fr;
       }
 
       .panel-header,
-      .source-header {
+      .source-header,
+      .log-entry-header {
         display: block;
       }
 
@@ -481,6 +576,11 @@
       .execute-status {
         margin-top: 12px;
         margin-left: 0;
+      }
+
+      .log-result {
+        display: inline-block;
+        margin-top: 8px;
       }
     }
   </style>
@@ -555,6 +655,8 @@
       <strong>Designer_-_Pattern</strong>,
       <strong>Pattern_Designer</strong>,
       <strong>Pattern by Designer</strong><br>
+      검색과 파일 비교에서는 악센트 차이를 무시합니다:
+      <strong>Descoteaux = Descôteaux</strong>.<br>
       완전히 같은 PDF가 이미 저장되어 있으면 파일명이 달라도 다운로드본만 삭제합니다.<br>
       같은 최종 파일명이 있지만 내용이 다르면 해당 파일만 보류합니다.<br>
       이번 작업에서 제외한 파일은 중복 검사, 이동, 삭제, 새 폴더 생성 계산에서 모두 제외됩니다.
@@ -569,9 +671,25 @@
     </div>
   </section>
 
+  <section class="panel">
+    <div class="panel-header">
+      <div>
+        <h2>4. 작업 로그</h2>
+        <p class="note">
+          실제 정리 실행 기록만 저장됩니다. 최근 50회까지 이 브라우저에 남습니다.
+        </p>
+      </div>
+      <button id="clearLogButton" class="secondary-button">로그 전체 지우기</button>
+    </div>
+
+    <div id="logList" class="log-list"></div>
+  </section>
+
   <script>
     const SINGLES_FOLDER_NAME = "!zz_Singles";
     const ALIAS_STORAGE_KEY = "pdfOrganizerDesignerAliasesV1";
+    const LOG_STORAGE_KEY = "pdfOrganizerActionLogsV1";
+    const MAX_LOG_ENTRIES = 50;
 
     const selectDownloadFolderButton = document.getElementById("selectDownloadFolderButton");
     const downloadFolderName = document.getElementById("downloadFolderName");
@@ -594,6 +712,9 @@
     const executeButton = document.getElementById("executeButton");
     const executeStatus = document.getElementById("executeStatus");
 
+    const clearLogButton = document.getElementById("clearLogButton");
+    const logList = document.getElementById("logList");
+
     let downloadDirectoryHandle = null;
     let libraryDirectoryHandle = null;
     let singlesDirectoryHandle = null;
@@ -603,10 +724,13 @@
     let singlesPdfNames = [];
 
     let designerAliases = loadDesignerAliases();
+    let actionLogs = loadActionLogs();
+
     let duplicateCheckComplete = false;
     let digestCache = new Map();
 
     renderAliasList();
+    renderActionLogs();
 
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
@@ -655,6 +779,21 @@
       );
 
       renderDesignerFolders(filteredFolders);
+    });
+
+    clearLogButton.addEventListener("click", () => {
+      if (actionLogs.length === 0) {
+        return;
+      }
+
+      const confirmed = window.confirm("작업 로그를 모두 지울까요?");
+
+      if (!confirmed) {
+        return;
+      }
+
+      actionLogs = [];
+      saveActionLogs();
     });
 
     duplicateCheckButton.addEventListener("click", async () => {
@@ -769,6 +908,8 @@
         return;
       }
 
+      const executionLog = createExecutionLog();
+
       duplicateCheckButton.disabled = true;
       executeButton.disabled = true;
       executeStatus.textContent = "파일을 정리하는 중입니다...";
@@ -776,15 +917,36 @@
       try {
         const plans = await buildExecutionPlans();
 
+        executionLog.createdFolders = [
+          ...new Set(
+            plans.movePlans
+              .filter((plan) => plan.targetType === "newDesignerFolder")
+              .map((plan) => plan.targetFolderName)
+          )
+        ];
+
         await validateMovePlans(plans.movePlans);
 
         for (const plan of plans.movePlans) {
           await copyFileThenRemoveOriginal(plan);
+
+          executionLog.moved.push({
+            from: plan.sourcePath,
+            to: `${plan.targetFolderName}/${plan.targetName}`
+          });
         }
 
         for (const plan of plans.deletePlans) {
           await plan.sourceDirectory.removeEntry(plan.sourceName);
+
+          executionLog.deleted.push({
+            file: plan.sourceName,
+            sameAs: plan.matchPath
+          });
         }
+
+        executionLog.status = "completed";
+        addActionLog(executionLog);
 
         executeStatus.textContent =
           `정리 완료: 이동 ${plans.movePlans.length}개 / 완전 중복 삭제 ${plans.deletePlans.length}개 / 보류 ${holdCount}개 / 제외 ${excludedCount}개`;
@@ -793,6 +955,10 @@
         await reloadDownloadData();
 
       } catch (error) {
+        executionLog.status = "failed";
+        executionLog.error = error.message;
+        addActionLog(executionLog);
+
         console.error(error);
         executeStatus.className = "execute-status error";
         executeStatus.textContent = `실행 실패: ${error.message}`;
@@ -981,6 +1147,193 @@
         .sort((a, b) => b.alias.length - a.alias.length);
 
       return possibleMatches[0] || null;
+    }
+
+    function loadActionLogs() {
+      try {
+        return JSON.parse(localStorage.getItem(LOG_STORAGE_KEY)) || [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveActionLogs() {
+      localStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(actionLogs));
+      renderActionLogs();
+    }
+
+    function addActionLog(log) {
+      actionLogs.unshift(log);
+      actionLogs = actionLogs.slice(0, MAX_LOG_ENTRIES);
+      saveActionLogs();
+    }
+
+    function createExecutionLog() {
+      return {
+        timestamp: new Date().toISOString(),
+        status: "pending",
+        createdFolders: [],
+        moved: [],
+        deleted: [],
+        held: downloadFiles
+          .filter((file) => file.analysis.action === "hold")
+          .map((file) => ({
+            file: file.name,
+            reason: file.analysis.message
+          })),
+        excluded: downloadFiles
+          .filter((file) => file.excluded)
+          .map((file) => file.name),
+        error: ""
+      };
+    }
+
+    function renderActionLogs() {
+      logList.innerHTML = "";
+
+      if (actionLogs.length === 0) {
+        logList.innerHTML =
+          `<p class="empty">아직 작업 로그가 없습니다.</p>`;
+        return;
+      }
+
+      actionLogs.forEach((log) => {
+        const moved = log.moved || [];
+        const deleted = log.deleted || [];
+        const held = log.held || [];
+        const excluded = log.excluded || [];
+        const createdFolders = log.createdFolders || [];
+
+        const entry = document.createElement("div");
+        entry.className =
+          log.status === "failed" ? "log-entry failed" : "log-entry";
+
+        const header = document.createElement("div");
+        header.className = "log-entry-header";
+
+        const date = document.createElement("div");
+        date.textContent = formatLogTimestamp(log.timestamp);
+
+        const result = document.createElement("div");
+        result.className =
+          log.status === "failed" ? "log-result failed" : "log-result";
+        result.textContent =
+          log.status === "failed" ? "실행 실패" : "정리 완료";
+
+        header.appendChild(date);
+        header.appendChild(result);
+
+        const summary = document.createElement("div");
+        summary.className = "log-summary";
+        summary.textContent =
+          `이동 ${moved.length}개 / 중복 삭제 ${deleted.length}개 / 보류 ${held.length}개 / 제외 ${excluded.length}개`;
+
+        entry.appendChild(header);
+        entry.appendChild(summary);
+
+        if (deleted.length > 0) {
+          const section = createLogSection("중복 삭제", "deleted");
+
+          deleted.forEach((item) => {
+            const line = document.createElement("div");
+            line.className = "log-line deleted";
+            line.textContent =
+              `삭제: ${item.file} → 동일 파일: ${item.sameAs}`;
+            section.appendChild(line);
+          });
+
+          entry.appendChild(section);
+        }
+
+        if (createdFolders.length > 0) {
+          const section = createLogSection("새 폴더 생성");
+
+          createdFolders.forEach((folderName) => {
+            const line = document.createElement("div");
+            line.className = "log-line";
+            line.textContent = folderName;
+            section.appendChild(line);
+          });
+
+          entry.appendChild(section);
+        }
+
+        if (moved.length > 0) {
+          const section = createLogSection("이동");
+
+          moved.forEach((item) => {
+            const line = document.createElement("div");
+            line.className = "log-line";
+            line.textContent = `${item.from} → ${item.to}`;
+            section.appendChild(line);
+          });
+
+          entry.appendChild(section);
+        }
+
+        if (held.length > 0) {
+          const section = createLogSection("보류");
+
+          held.forEach((item) => {
+            const line = document.createElement("div");
+            line.className = "log-line";
+            line.textContent = `${item.file} — ${item.reason}`;
+            section.appendChild(line);
+          });
+
+          entry.appendChild(section);
+        }
+
+        if (excluded.length > 0) {
+          const section = createLogSection("이번 작업에서 제외");
+
+          excluded.forEach((fileName) => {
+            const line = document.createElement("div");
+            line.className = "log-line";
+            line.textContent = `${fileName} — 다운로드 폴더에 남김`;
+            section.appendChild(line);
+          });
+
+          entry.appendChild(section);
+        }
+
+        if (log.error) {
+          const errorBox = document.createElement("div");
+          errorBox.className = "log-error";
+          errorBox.textContent = `오류: ${log.error}`;
+          entry.appendChild(errorBox);
+        }
+
+        logList.appendChild(entry);
+      });
+    }
+
+    function createLogSection(title, extraClass = "") {
+      const section = document.createElement("div");
+      section.className = "log-section";
+
+      const heading = document.createElement("div");
+      heading.className =
+        extraClass
+          ? `log-section-title ${extraClass}`
+          : "log-section-title";
+      heading.textContent = title;
+
+      section.appendChild(heading);
+
+      return section;
+    }
+
+    function formatLogTimestamp(timestamp) {
+      return new Intl.DateTimeFormat("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      }).format(new Date(timestamp));
     }
 
     function invalidateDuplicateCheck() {
@@ -1880,7 +2233,11 @@
     }
 
     function normalizeText(text) {
-      return text.trim().toLocaleLowerCase("ko");
+      return text
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLocaleLowerCase("ko");
     }
 
     function escapeRegExp(text) {
@@ -1910,7 +2267,8 @@
         if (file.analysis.action === "deleteDuplicate") {
           deletePlans.push({
             sourceDirectory: downloadDirectoryHandle,
-            sourceName: file.name
+            sourceName: file.name,
+            matchPath: file.analysis.matchPath
           });
           return;
         }
@@ -1929,6 +2287,7 @@
           movePlans.push({
             sourceDirectory: downloadDirectoryHandle,
             sourceName: file.name,
+            sourcePath: file.name,
             targetFolderName: existingFolderName,
             targetName: patternFileName,
             targetType: "existing"
@@ -1964,6 +2323,7 @@
             movePlans.push({
               sourceDirectory: singlesDirectory,
               sourceName: fileName,
+              sourcePath: `${SINGLES_FOLDER_NAME}/${fileName}`,
               targetFolderName: group.destinationName,
               targetName: removeSinglesDesignerPrefix(
                 fileName,
@@ -1977,6 +2337,7 @@
             movePlans.push({
               sourceDirectory: downloadDirectoryHandle,
               sourceName: sourceFile.name,
+              sourcePath: sourceFile.name,
               targetFolderName: group.destinationName,
               targetName: patternFileName,
               targetType: "newDesignerFolder"
@@ -1987,6 +2348,7 @@
             movePlans.push({
               sourceDirectory: downloadDirectoryHandle,
               sourceName: sourceFile.name,
+              sourcePath: sourceFile.name,
               targetFolderName: SINGLES_FOLDER_NAME,
               targetName: `${group.destinationName}_${patternFileName}`,
               targetType: "singles"
@@ -2030,8 +2392,14 @@
     function removeSinglesDesignerPrefix(fileName, destinationName) {
       const prefix = `${destinationName}_`;
 
-      return normalizeText(fileName).startsWith(normalizeText(prefix))
-        ? fileName.slice(prefix.length)
+      if (!normalizeText(fileName).startsWith(normalizeText(prefix))) {
+        return fileName;
+      }
+
+      const separatorIndex = fileName.indexOf("_");
+
+      return separatorIndex >= 0
+        ? fileName.slice(separatorIndex + 1)
         : fileName;
     }
 
