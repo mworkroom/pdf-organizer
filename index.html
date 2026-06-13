@@ -242,6 +242,29 @@
       padding: 0 6px;
     }
 
+    .alias-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    
+    .alias-toggle-button {
+      background: #ede8e1;
+      color: #333;
+      padding: 7px 11px;
+      font-size: 13px;
+    }
+    
+    .alias-toggle-button:hover {
+      background: #ddd6cd;
+    }
+    
+    .alias-box.collapsed .alias-content {
+      display: none;
+    }    
+    
+
     .sort-row {
       border: 1px solid #e6e1da;
       border-radius: 14px;
@@ -627,18 +650,31 @@
 
     <div id="designerFolderList" class="list"></div>
 
-    <div class="alias-box">
-      <p class="alias-title">
-        기억된 디자이너 연결 <span id="aliasCount"></span>
-      </p>
-
-      <p class="note">
-        기억된 연결은 이 브라우저에 저장됩니다.
-        잘못 저장한 연결은 삭제할 수 있습니다.
-      </p>
-
-      <div id="aliasList" style="margin-top: 12px;"></div>
+    <div class="alias-box collapsed" id="aliasBox">
+      <div class="alias-header">
+        <p class="alias-title">
+          기억된 디자이너 연결 <span id="aliasCount"></span>
+        </p>
+    
+        <button
+          id="aliasToggleButton"
+          type="button"
+          class="alias-toggle-button"
+        >
+          펼치기
+        </button>
+      </div>
+    
+      <div class="alias-content">
+        <p class="note">
+          기억된 연결은 이 브라우저에 저장됩니다.
+          잘못 저장한 연결은 삭제할 수 있습니다.
+        </p>
+    
+        <div id="aliasList" style="margin-top: 12px;"></div>
+      </div>
     </div>
+    
   </section>
 
   <section id="sortingPanel" class="panel hidden">
@@ -705,6 +741,8 @@
 
     const aliasCount = document.getElementById("aliasCount");
     const aliasList = document.getElementById("aliasList");
+    const aliasBox = document.getElementById("aliasBox");
+    const aliasToggleButton = document.getElementById("aliasToggleButton");
 
     const sortingPanel = document.getElementById("sortingPanel");
     const sortingList = document.getElementById("sortingList");
@@ -732,6 +770,11 @@
     renderAliasList();
     renderActionLogs();
 
+    aliasToggleButton.addEventListener("click", () => {
+  const collapsed = aliasBox.classList.toggle("collapsed");
+  aliasToggleButton.textContent = collapsed ? "펼치기" : "접기";
+});
+    
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         downloadDirectoryHandle = await window.showDirectoryPicker();
@@ -2208,6 +2251,11 @@
         "i"
       );
 
+      const designerInMiddleWithSymbol = new RegExp(
+        `([_-]+)${escapedDesigner}([_-]+)`,
+        "i"
+      );
+
       let cleanedName = baseName;
 
       if (designerAtStart.test(cleanedName)) {
@@ -2216,6 +2264,8 @@
         cleanedName = cleanedName.replace(designerAtEndWithBy, "");
       } else if (designerAtEndWithSymbol.test(cleanedName)) {
         cleanedName = cleanedName.replace(designerAtEndWithSymbol, "");
+      } else if (designerInMiddleWithSymbol.test(cleanedName)) {
+        cleanedName = cleanedName.replace(designerInMiddleWithSymbol, "$1");
       }
 
       cleanedName = cleanedName.trim();
