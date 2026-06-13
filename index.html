@@ -2402,6 +2402,11 @@
         "i"
       );
 
+      const designerAtStartWithSpace = new RegExp(
+        `^${escapedDesigner}\\s+`,
+        "i"
+      );
+
       const designerAtEndWithSymbol = new RegExp(
         `(?:\\s*[_-]\\s*)+${escapedDesigner}$`,
         "i"
@@ -2409,6 +2414,11 @@
 
       const designerAtEndWithBy = new RegExp(
         `\\s+by\\s+${escapedDesigner}$`,
+        "i"
+      );
+
+      const designerAtEndWithSpace = new RegExp(
+        `\\s+${escapedDesigner}$`,
         "i"
       );
 
@@ -2421,10 +2431,14 @@
 
       if (designerAtStart.test(cleanedName)) {
         cleanedName = cleanedName.replace(designerAtStart, "");
+      } else if (designerAtStartWithSpace.test(cleanedName)) {
+        cleanedName = cleanedName.replace(designerAtStartWithSpace, "");
       } else if (designerAtEndWithBy.test(cleanedName)) {
         cleanedName = cleanedName.replace(designerAtEndWithBy, "");
       } else if (designerAtEndWithSymbol.test(cleanedName)) {
         cleanedName = cleanedName.replace(designerAtEndWithSymbol, "");
+      } else if (designerAtEndWithSpace.test(cleanedName)) {
+        cleanedName = cleanedName.replace(designerAtEndWithSpace, "");
       } else if (designerInMiddleWithSymbol.test(cleanedName)) {
         cleanedName = cleanedName.replace(designerInMiddleWithSymbol, "$1");
       }
