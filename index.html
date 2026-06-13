@@ -242,29 +242,6 @@
       padding: 0 6px;
     }
 
-    .alias-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    
-    .alias-toggle-button {
-      background: #ede8e1;
-      color: #333;
-      padding: 7px 11px;
-      font-size: 13px;
-    }
-    
-    .alias-toggle-button:hover {
-      background: #ddd6cd;
-    }
-    
-    .alias-box.collapsed .alias-content {
-      display: none;
-    }    
-    
-
     .sort-row {
       border: 1px solid #e6e1da;
       border-radius: 14px;
@@ -568,6 +545,53 @@
       line-height: 1.5;
     }
 
+
+    .alias-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .alias-toggle-button {
+      background: #ede8e1;
+      color: #333;
+      padding: 7px 11px;
+      font-size: 13px;
+    }
+
+    .alias-toggle-button:hover {
+      background: #ddd6cd;
+    }
+
+    .alias-title {
+      margin: 0;
+    }
+
+    .alias-box.collapsed .alias-content {
+      display: none;
+    }
+
+    .special-folder-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .special-folder-options label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .special-folder-options input {
+      accent-color: #735c36;
+    }
+
     @media (max-width: 800px) {
       .sort-grid {
         grid-template-columns: 1fr;
@@ -655,7 +679,7 @@
         <p class="alias-title">
           기억된 디자이너 연결 <span id="aliasCount"></span>
         </p>
-    
+
         <button
           id="aliasToggleButton"
           type="button"
@@ -664,17 +688,16 @@
           펼치기
         </button>
       </div>
-    
+
       <div class="alias-content">
         <p class="note">
           기억된 연결은 이 브라우저에 저장됩니다.
           잘못 저장한 연결은 삭제할 수 있습니다.
         </p>
-    
+
         <div id="aliasList" style="margin-top: 12px;"></div>
       </div>
     </div>
-    
   </section>
 
   <section id="sortingPanel" class="panel hidden">
@@ -723,6 +746,29 @@
 
   <script>
     const SINGLES_FOLDER_NAME = "!zz_Singles";
+
+    const SPECIAL_FOLDER_OPTIONS = {
+      singles: {
+        label: "기본 / Singles",
+        folderName: SINGLES_FOLDER_NAME
+      },
+      mittens: {
+        label: "장갑",
+        folderName: "!z_Mittens"
+      },
+      scarves: {
+        label: "스카프",
+        folderName: "!z_Scarves"
+      },
+      shawls: {
+        label: "숄",
+        folderName: "!z_Shawls"
+      },
+      hoods: {
+        label: "후드",
+        folderName: "!z_Hoods"
+      }
+    };
     const ALIAS_STORAGE_KEY = "pdfOrganizerDesignerAliasesV1";
     const LOG_STORAGE_KEY = "pdfOrganizerActionLogsV1";
     const MAX_LOG_ENTRIES = 50;
@@ -771,10 +817,10 @@
     renderActionLogs();
 
     aliasToggleButton.addEventListener("click", () => {
-  const collapsed = aliasBox.classList.toggle("collapsed");
-  aliasToggleButton.textContent = collapsed ? "펼치기" : "접기";
-});
-    
+      const collapsed = aliasBox.classList.toggle("collapsed");
+      aliasToggleButton.textContent = collapsed ? "펼치기" : "접기";
+    });
+
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         downloadDirectoryHandle = await window.showDirectoryPicker();
@@ -1024,6 +1070,7 @@
         patternFileName: entry.name,
         patternManuallyEdited: false,
         autoLinkedAlias: "",
+        specialFolderKey: "singles",
         previewElement: null,
         statusElement: null,
         analysis: {
@@ -1401,10 +1448,17 @@
       return downloadFiles
         .filter((file) => !file.excluded)
         .some((file) => {
-          return (
-            !file.destinationName.trim() ||
-            !ensurePdfExtension(file.patternFileName.trim())
-          );
+          const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+
+          if (!patternFileName) {
+            return true;
+          }
+
+          if (file.specialFolderKey !== "singles" && !getExistingFolderName(file)) {
+            return false;
+          }
+
+          return !file.destinationName.trim();
         });
     }
 
@@ -1570,6 +1624,42 @@
         patternField.appendChild(patternInput);
         patternField.appendChild(resetButton);
 
+        const specialFolderField = document.createElement("div");
+        specialFolderField.className = "field";
+
+        const specialFolderLabel = document.createElement("label");
+        specialFolderLabel.className = "field-label";
+        specialFolderLabel.textContent = "디자이너 미지정 시 저장 위치";
+
+        const specialFolderOptions = document.createElement("div");
+        specialFolderOptions.className = "special-folder-options";
+
+        Object.entries(SPECIAL_FOLDER_OPTIONS).forEach(([key, option]) => {
+          const label = document.createElement("label");
+
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = `special-folder-${file.name}`;
+          radio.value = key;
+          radio.checked = file.specialFolderKey === key;
+          radio.disabled = file.excluded || !!getExistingFolderName(file);
+
+          const text = document.createElement("span");
+          text.textContent = option.label;
+
+          radio.addEventListener("change", () => {
+            file.specialFolderKey = key;
+            invalidateDuplicateCheck();
+          });
+
+          label.appendChild(radio);
+          label.appendChild(text);
+          specialFolderOptions.appendChild(label);
+        });
+
+        specialFolderField.appendChild(specialFolderLabel);
+        specialFolderField.appendChild(specialFolderOptions);
+
         const previewField = document.createElement("div");
         previewField.className = "preview-area";
 
@@ -1594,6 +1684,7 @@
         grid.appendChild(destinationField);
         grid.appendChild(sourceDesignerField);
         grid.appendChild(patternField);
+        grid.appendChild(specialFolderField);
         grid.appendChild(previewField);
 
         row.appendChild(sourceHeader);
@@ -1808,11 +1899,11 @@
       const destinationName = file.destinationName.trim();
       const patternFileName = ensurePdfExtension(file.patternFileName.trim());
       const existingFolderName = getExistingFolderName(file);
+      const specialOption = getSpecialFolderOption(file);
 
-      if (!destinationName || !patternFileName) {
+      if (!patternFileName) {
         preview.classList.add("pending");
-        preview.textContent =
-          "저장 기준 이름과 패턴 파일명을 입력하세요.";
+        preview.textContent = "패턴 파일명을 입력하세요.";
         return;
       }
 
@@ -1820,6 +1911,20 @@
         preview.classList.add("existing");
         preview.textContent =
           `${existingFolderName}/${patternFileName}`;
+        return;
+      }
+
+      if (file.specialFolderKey !== "singles") {
+        preview.classList.add("single");
+        preview.textContent =
+          `${specialOption.folderName}/${patternFileName}`;
+        return;
+      }
+
+      if (!destinationName) {
+        preview.classList.add("pending");
+        preview.textContent =
+          "저장 기준 이름과 패턴 파일명을 입력하세요.";
         return;
       }
 
@@ -1901,6 +2006,11 @@
       ) || null;
     }
 
+    function getSpecialFolderOption(file) {
+      return SPECIAL_FOLDER_OPTIONS[file.specialFolderKey] ||
+        SPECIAL_FOLDER_OPTIONS.singles;
+    }
+
     function findSinglesFiles(destinationName) {
       const prefix = normalizeText(`${destinationName}_`);
 
@@ -1914,6 +2024,7 @@
 
       return downloadFiles.filter((file) =>
         !file.excluded &&
+        file.specialFolderKey === "singles" &&
         !getExistingFolderName(file) &&
         normalizeText(file.destinationName) === targetName
       );
@@ -1931,6 +2042,7 @@
       });
 
       const existingFolderGroups = new Map();
+      const specialFolderGroups = new Map();
       const singlesGroups = new Map();
 
       downloadFiles
@@ -1952,6 +2064,21 @@
             return;
           }
 
+          if (file.specialFolderKey !== "singles") {
+            const specialOption = getSpecialFolderOption(file);
+            const key = normalizeText(specialOption.folderName);
+
+            if (!specialFolderGroups.has(key)) {
+              specialFolderGroups.set(key, {
+                folderName: specialOption.folderName,
+                files: []
+              });
+            }
+
+            specialFolderGroups.get(key).files.push(file);
+            return;
+          }
+
           const destinationName = file.destinationName.trim();
           const key = normalizeText(destinationName);
 
@@ -1969,6 +2096,10 @@
         await analyseExistingFolderGroup(group);
       }
 
+      for (const group of specialFolderGroups.values()) {
+        await analyseSpecialFolderGroup(group);
+      }
+
       for (const group of singlesGroups.values()) {
         await analyseSinglesGroup(group);
       }
@@ -1980,6 +2111,21 @@
 
       const storedFiles =
         await listPdfCandidates(directoryHandle, group.folderName);
+
+      await markExactContentDuplicates(group.files, storedFiles);
+      await markIncomingBatchDuplicates(group.files);
+
+      markNameConflicts(
+        group.files,
+        storedFiles,
+        (file) => ensurePdfExtension(file.patternFileName.trim()),
+        (storedFile) => storedFile.name
+      );
+    }
+
+    async function analyseSpecialFolderGroup(group) {
+      const storedFiles =
+        await listSpecialFolderCandidates(group.folderName);
 
       await markExactContentDuplicates(group.files, storedFiles);
       await markIncomingBatchDuplicates(group.files);
@@ -2150,6 +2296,21 @@
           incomingNames.set(key, incomingFile);
         }
       });
+    }
+
+    async function listSpecialFolderCandidates(folderName) {
+      try {
+        const directoryHandle =
+          await libraryDirectoryHandle.getDirectoryHandle(folderName);
+
+        return await listPdfCandidates(directoryHandle, folderName);
+      } catch (error) {
+        if (error.name === "NotFoundError") {
+          return [];
+        }
+
+        throw error;
+      }
     }
 
     async function listPdfCandidates(directoryHandle, folderName) {
@@ -2345,6 +2506,21 @@
           return;
         }
 
+        if (file.specialFolderKey !== "singles") {
+          const specialOption = getSpecialFolderOption(file);
+
+          movePlans.push({
+            sourceDirectory: downloadDirectoryHandle,
+            sourceName: file.name,
+            sourcePath: file.name,
+            targetFolderName: specialOption.folderName,
+            targetName: patternFileName,
+            targetType: "specialFolder"
+          });
+
+          return;
+        }
+
         const destinationName = file.destinationName.trim();
         const key = normalizeText(destinationName);
 
@@ -2415,7 +2591,9 @@
             await libraryDirectoryHandle.getDirectoryHandle(
               plan.targetFolderName,
               {
-                create: plan.targetType === "newDesignerFolder"
+                create:
+                  plan.targetType === "newDesignerFolder" ||
+                  plan.targetType === "specialFolder"
               }
             );
         }
