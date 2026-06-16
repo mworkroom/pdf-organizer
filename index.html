@@ -768,7 +768,7 @@
         label: "장갑",
         folderName: "!z_Mittens"
       },
-      shawls: {
+      socks: {
         label: "양말",
         folderName: "!z_Socks"
       }
@@ -1458,10 +1458,6 @@
             return true;
           }
 
-          if (file.specialFolderKey !== "singles" && !getExistingFolderName(file)) {
-            return false;
-          }
-
           return !file.destinationName.trim();
         });
     }
@@ -1918,17 +1914,17 @@
         return;
       }
 
-      if (file.specialFolderKey !== "singles") {
-        preview.classList.add("single");
-        preview.textContent =
-          `${specialOption.folderName}/${patternFileName}`;
-        return;
-      }
-
       if (!destinationName) {
         preview.classList.add("pending");
         preview.textContent =
           "저장 기준 이름과 패턴 파일명을 입력하세요.";
+        return;
+      }
+
+      if (file.specialFolderKey !== "singles") {
+        preview.classList.add("single");
+        preview.textContent =
+          `${specialOption.folderName}/${getSpecialFolderTargetName(file)}`;
         return;
       }
 
@@ -2013,6 +2009,13 @@
     function getSpecialFolderOption(file) {
       return SPECIAL_FOLDER_OPTIONS[file.specialFolderKey] ||
         SPECIAL_FOLDER_OPTIONS.singles;
+    }
+
+    function getSpecialFolderTargetName(file) {
+      const destinationName = file.destinationName.trim();
+      const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+
+      return `${destinationName}_${patternFileName}`;
     }
 
     function findSinglesFiles(destinationName) {
@@ -2137,7 +2140,7 @@
       markNameConflicts(
         group.files,
         storedFiles,
-        (file) => ensurePdfExtension(file.patternFileName.trim()),
+        (file) => getSpecialFolderTargetName(file),
         (storedFile) => storedFile.name
       );
     }
@@ -2532,7 +2535,7 @@
             sourceName: file.name,
             sourcePath: file.name,
             targetFolderName: specialOption.folderName,
-            targetName: patternFileName,
+            targetName: getSpecialFolderTargetName(file),
             targetType: "specialFolder"
           });
 
