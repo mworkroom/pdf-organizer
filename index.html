@@ -22,6 +22,7 @@
     h1 {
       margin: 0 0 8px;
       font-size: 30px;
+      padding-bottom: 20px;
     }
 
     h2 {
@@ -253,6 +254,24 @@
     .sort-row.excluded {
       background: #fbfaf8;
       border-color: #ded9d2;
+    }
+
+    .sort-row.incomplete {
+      border: 3px solid #c93636;
+      background: #fff5f5;
+      box-shadow: 0 0 0 4px rgba(201, 54, 54, 0.12);
+    }
+
+    .sort-row.incomplete .source-file::before {
+      content: "⚠ 누락 항목  ";
+      color: #a61f1f;
+      font-weight: bold;
+    }
+
+    .text-input.incomplete-input {
+      border-color: #c93636;
+      background: #fffafa;
+      outline: 2px solid rgba(201, 54, 54, 0.18);
     }
 
     .source-header {
@@ -635,7 +654,6 @@
 
 <body>
   <h1>PDF Organizer</h1>
-  <p class="description">다운로드된 PDF를 기존 디자이너 폴더 또는 !zz_Singles 기준으로 정리합니다.</p>
 
   <section class="panel">
     <div class="panel-header">
@@ -691,9 +709,15 @@
 
       <div class="alias-content">
         <p class="note">
-          기억된 연결은 이 브라우저에 저장됩니다.
-          잘못 저장한 연결은 삭제할 수 있습니다.
+          연결 정보는 브라우저와 선택한 패턴 폴더의 백업 파일에 함께 저장됩니다.
+          브라우저 데이터를 삭제해도 같은 패턴 폴더를 선택하면 자동 복원됩니다.
         </p>
+
+        <div style="margin-top: 10px;">
+          <button id="exportAliasesButton" type="button" class="secondary-button">연결표 내보내기</button>
+          <button id="importAliasesButton" type="button" class="secondary-button">연결표 가져오기</button>
+          <input id="importAliasesInput" type="file" accept="application/json,.json" class="hidden">
+        </div>
 
         <div id="aliasList" style="margin-top: 12px;"></div>
       </div>
@@ -774,6 +798,7 @@
       }
     };
     const ALIAS_STORAGE_KEY = "pdfOrganizerDesignerAliasesV1";
+    const ALIAS_BACKUP_FILE_NAME = "!pdf-organizer-designer-aliases.json";
     const LOG_STORAGE_KEY = "pdfOrganizerActionLogsV1";
     const MAX_LOG_ENTRIES = 50;
 
@@ -793,6 +818,9 @@
     const aliasList = document.getElementById("aliasList");
     const aliasBox = document.getElementById("aliasBox");
     const aliasToggleButton = document.getElementById("aliasToggleButton");
+    const exportAliasesButton = document.getElementById("exportAliasesButton");
+    const importAliasesButton = document.getElementById("importAliasesButton");
+    const importAliasesInput = document.getElementById("importAliasesInput");
 
     const sortingPanel = document.getElementById("sortingPanel");
     const sortingList = document.getElementById("sortingList");
@@ -825,6 +853,33 @@
       aliasToggleButton.textContent = collapsed ? "펼치기" : "접기";
     });
 
+    exportAliasesButton.addEventListener("click", exportDesignerAliases);
+
+    importAliasesButton.addEventListener("click", () => {
+      importAliasesInput.value = "";
+      importAliasesInput.click();
+    });
+
+    importAliasesInput.addEventListener("change", async () => {
+      const file = importAliasesInput.files?.[0];
+      if (!file) return;
+
+      try {
+        const imported = JSON.parse(await file.text());
+        if (!imported || typeof imported !== "object" || Array.isArray(imported)) {
+          throw new Error("올바른 연결표 형식이 아닙니다.");
+        }
+
+        designerAliases = { ...designerAliases, ...imported };
+        saveDesignerAliases();
+        applyRememberedConnectionsToEmptyFiles();
+        renderSortingRows();
+        alert(`연결표를 가져왔습니다. 현재 ${Object.keys(designerAliases).length}개입니다.`);
+      } catch (error) {
+        alert(`연결표를 가져오지 못했습니다.\n\n${error.message}`);
+      }
+    });
+
     selectDownloadFolderButton.addEventListener("click", async () => {
       try {
         downloadDirectoryHandle = await window.showDirectoryPicker();
@@ -849,6 +904,7 @@
         designerSearch.value = "";
 
         await reloadLibraryData();
+        await loadDesignerAliasesFromLibrary();
 
         applyRememberedConnectionsToEmptyFiles();
         invalidateDuplicateCheck();
@@ -902,8 +958,7 @@
         return;
       }
 
-      if (hasIncompleteFiles()) {
-        alert("저장 기준 이름 또는 패턴 파일명이 비어 있는 파일이 있습니다.");
+      if (!validateCompletenessAndFocus()) {
         return;
       }
 
@@ -963,8 +1018,7 @@
         return;
       }
 
-      if (hasIncompleteFiles()) {
-        alert("저장 기준 이름 또는 패턴 파일명이 비어 있는 파일이 있습니다.");
+      if (!validateCompletenessAndFocus()) {
         return;
       }
 
@@ -1096,6 +1150,58 @@
     function saveDesignerAliases() {
       localStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(designerAliases));
       renderAliasList();
+      persistDesignerAliasesToLibrary();
+    }
+
+    async function persistDesignerAliasesToLibrary() {
+      if (!libraryDirectoryHandle) return;
+
+      try {
+        const fileHandle = await libraryDirectoryHandle.getFileHandle(
+          ALIAS_BACKUP_FILE_NAME,
+          { create: true }
+        );
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(designerAliases, null, 2));
+        await writable.close();
+      } catch (error) {
+        console.warn("디자이너 연결 백업 파일 저장 실패", error);
+      }
+    }
+
+    async function loadDesignerAliasesFromLibrary() {
+      if (!libraryDirectoryHandle) return;
+
+      try {
+        const fileHandle = await libraryDirectoryHandle.getFileHandle(ALIAS_BACKUP_FILE_NAME);
+        const file = await fileHandle.getFile();
+        const saved = JSON.parse(await file.text());
+
+        if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+
+        designerAliases = { ...designerAliases, ...saved };
+        localStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(designerAliases));
+        renderAliasList();
+      } catch (error) {
+        if (error.name !== "NotFoundError") {
+          console.warn("디자이너 연결 백업 파일 불러오기 실패", error);
+        }
+      }
+    }
+
+    function exportDesignerAliases() {
+      const blob = new Blob(
+        [JSON.stringify(designerAliases, null, 2)],
+        { type: "application/json" }
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pdf-organizer-designer-aliases-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     }
 
     function renderAliasList() {
@@ -1448,18 +1554,59 @@
       updateAllPreviews();
     }
 
+    function getIncompleteFiles() {
+      return downloadFiles.filter((file) => {
+        if (file.excluded) return false;
+
+        const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+        return !patternFileName || !file.destinationName.trim();
+      });
+    }
+
     function hasIncompleteFiles() {
-      return downloadFiles
-        .filter((file) => !file.excluded)
-        .some((file) => {
-          const patternFileName = ensurePdfExtension(file.patternFileName.trim());
+      return getIncompleteFiles().length > 0;
+    }
 
-          if (!patternFileName) {
-            return true;
-          }
+    function clearIncompleteHighlights() {
+      downloadFiles.forEach((file) => {
+        file.rowElement?.classList.remove("incomplete");
+        file.destinationInputElement?.classList.remove("incomplete-input");
+        file.patternInputElement?.classList.remove("incomplete-input");
+      });
+    }
 
-          return !file.destinationName.trim();
-        });
+    function validateCompletenessAndFocus() {
+      clearIncompleteHighlights();
+      const incompleteFiles = getIncompleteFiles();
+
+      if (incompleteFiles.length === 0) return true;
+
+      incompleteFiles.forEach((file) => {
+        file.rowElement?.classList.add("incomplete");
+        if (!file.destinationName.trim()) {
+          file.destinationInputElement?.classList.add("incomplete-input");
+        }
+        if (!ensurePdfExtension(file.patternFileName.trim())) {
+          file.patternInputElement?.classList.add("incomplete-input");
+        }
+      });
+
+      const first = incompleteFiles[0];
+      alert(
+        `입력하지 않은 파일이 ${incompleteFiles.length}개 있습니다.\n\n` +
+        `첫 번째 누락: ${first.name}\n` +
+        `확인을 누르면 해당 위치로 이동합니다.`
+      );
+
+      requestAnimationFrame(() => {
+        first.rowElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+        const target = !first.destinationName.trim()
+          ? first.destinationInputElement
+          : first.patternInputElement;
+        target?.focus({ preventScroll: true });
+      });
+
+      return false;
     }
 
     function renderDownloadFileList() {
@@ -1511,6 +1658,7 @@
       downloadFiles.forEach((file) => {
         const row = document.createElement("div");
         row.className = file.excluded ? "sort-row excluded" : "sort-row";
+        file.rowElement = row;
 
         const sourceHeader = document.createElement("div");
         sourceHeader.className = "source-header";
@@ -1552,6 +1700,7 @@
         destinationInput.placeholder = "예: Knitree, 마요, 나무 Knitree";
         destinationInput.value = file.destinationName;
         destinationInput.disabled = file.excluded;
+        file.destinationInputElement = destinationInput;
 
         const selectedLabel = document.createElement("div");
         selectedLabel.className = "selected-label";
@@ -1613,6 +1762,7 @@
         patternInput.placeholder = "예: summer_top.pdf";
         patternInput.value = file.patternFileName;
         patternInput.disabled = file.excluded;
+        file.patternInputElement = patternInput;
 
         const resetButton = document.createElement("button");
         resetButton.type = "button";
