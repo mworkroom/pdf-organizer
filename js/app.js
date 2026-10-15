@@ -85,7 +85,7 @@ restoreDraftButton.addEventListener("click", restoreReviewDraft);
 cancelDuplicateCheckButton.addEventListener("click", () => {
   duplicateCheckController?.abort();
   cancelDuplicateCheckButton.disabled = true;
-  executeStatus.textContent = "진행 중인 파일 처리가 끝나면 검사를 취소합니다...";
+  executeStatus.textContent = "Canceling after the current file finishes...";
 });
 window.addEventListener("beforeunload", event => {
   if (!draftLockedElsewhere && (draftRevision !== savedDraftRevision || operationBusy || categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size)) {
@@ -104,7 +104,7 @@ renderActionLogs();
 
 aliasToggleButton.addEventListener("click", () => {
   const collapsed = aliasBox.classList.toggle("collapsed");
-  aliasToggleButton.textContent = collapsed ? "펼치기" : "접기";
+  aliasToggleButton.textContent = collapsed ? "Expand" : "Collapse";
 });
 
 exportAliasesButton.addEventListener("click", exportDesignerAliases);
@@ -121,16 +121,16 @@ importAliasesInput.addEventListener("change", async () => {
   try {
     const imported = JSON.parse(await file.text());
     if (!imported || typeof imported !== "object" || Array.isArray(imported)) {
-      throw new Error("올바른 연결표 형식이 아닙니다.");
+      throw new Error("Invalid alias file format.");
     }
 
     designerAliases = { ...designerAliases, ...imported };
     saveDesignerAliases();
     applyRememberedConnectionsToEmptyFiles();
     renderSortingRows();
-    alert(`연결표를 가져왔습니다. 현재 ${Object.keys(designerAliases).length}개입니다.`);
+    alert(`Aliases imported. Total: ${Object.keys(designerAliases).length}.`);
   } catch (error) {
-    alert(`연결표를 가져오지 못했습니다.\n\n${error.message}`);
+    alert(`Could not import aliases.\n\n${error.message}`);
   }
 });
 
@@ -149,7 +149,7 @@ selectDownloadFolderButton.addEventListener("click", async () => {
     if (!sameFolder) { resetBatchState(); digestCache.clear(); }
     downloadDirectoryHandle = handle;
 
-    downloadFolderName.textContent = `선택한 폴더: ${downloadDirectoryHandle.name}`;
+    downloadFolderName.textContent = `Selected folder: ${downloadDirectoryHandle.name}`;
 
     await reloadDownloadData();
     executeStatus.className = 'execute-status';
@@ -160,7 +160,7 @@ selectDownloadFolderButton.addEventListener("click", async () => {
   } catch (error) {
     if (previous) restoreFolderReview(previous);
     if (error.name !== "AbortError") {
-      alert(`다운로드 폴더를 연결하지 못했습니다.\n\n${error.message}`);
+      alert(`Could not connect the download folder.\n\n${error.message}`);
       console.error(error);
     }
   } finally {
@@ -186,7 +186,7 @@ selectLibraryFolderButton.addEventListener("click", async () => {
     }
     libraryDirectoryHandle = handle;
 
-    libraryFolderName.textContent = `선택한 폴더: ${libraryDirectoryHandle.name}`;
+    libraryFolderName.textContent = `Selected folder: ${libraryDirectoryHandle.name}`;
     designerSearch.value = "";
 
     await reloadLibraryData();
@@ -203,7 +203,7 @@ selectLibraryFolderButton.addEventListener("click", async () => {
   } catch (error) {
     if (previous) restoreFolderReview(previous);
     if (error.name !== "AbortError") {
-      alert(`패턴 폴더를 연결하지 못했습니다.\n\n${error.message}`);
+      alert(`Could not connect the pattern folder.\n\n${error.message}`);
       console.error(error);
     }
   } finally {
@@ -226,7 +226,7 @@ clearLogButton.addEventListener("click", () => {
     return;
   }
 
-  const confirmed = window.confirm("작업 로그를 모두 지울까요?");
+  const confirmed = window.confirm("Clear all activity logs?");
 
   if (!confirmed) {
     return;
@@ -238,12 +238,12 @@ clearLogButton.addEventListener("click", () => {
 
 duplicateCheckButton.addEventListener("click", async () => {
   if (!downloadDirectoryHandle || !libraryDirectoryHandle) {
-    alert("다운로드 폴더와 기존 패턴 폴더를 먼저 선택하세요.");
+    alert("Select the download and pattern folders first.");
     return;
   }
 
   if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) {
-    alert('Pattern Library에서 편집 중인 분류·대표 페이지를 먼저 저장하거나 취소하세요.');
+    alert('Save or cancel category and cover page edits in Pattern Library first.');
     setActiveView('library');
     return;
   }
@@ -251,7 +251,7 @@ duplicateCheckButton.addEventListener("click", async () => {
   const activeFiles = downloadFiles.filter((file) => !file.excluded);
 
   if (activeFiles.length === 0) {
-    alert("검사할 PDF 파일이 없습니다.");
+    alert("No PDFs to check.");
     return;
   }
 
@@ -265,7 +265,7 @@ duplicateCheckButton.addEventListener("click", async () => {
   cancelDuplicateCheckButton.disabled = false;
   cancelDuplicateCheckButton.classList.remove("hidden");
   executeStatus.className = "execute-status";
-  executeStatus.textContent = "중복 파일을 검사하는 중입니다...";
+  executeStatus.textContent = "Checking for duplicate files...";
 
   try {
     await saveReviewDraft();
@@ -292,7 +292,7 @@ duplicateCheckButton.addEventListener("click", async () => {
     ).length;
 
     executeStatus.textContent =
-      `중복 검사 완료: 이동 ${moveCount}개 / 완전 중복 삭제 ${duplicateCount}개 / 보류 ${holdCount}개 / 제외 ${excludedCount}개`;
+      `Duplicate check complete: ${moveCount} to move / ${duplicateCount} exact duplicates to delete / ${holdCount} on hold / ${excludedCount} excluded`;
 
   } catch (error) {
     downloadFiles.forEach(file => {
@@ -301,13 +301,13 @@ duplicateCheckButton.addEventListener("click", async () => {
     duplicateCheckComplete = false;
     updateAllPreviews();
     if (error.name === "AbortError") {
-      executeStatus.textContent = "중복 검사를 취소했습니다. 검토 내용은 유지됩니다. 정리 전에 다시 검사하세요.";
+      executeStatus.textContent = "Duplicate check canceled. Reviews are preserved. Run the check again before organizing.";
       return;
     }
     console.error(error);
     executeStatus.className = "execute-status error";
-    executeStatus.textContent = `중복 검사 실패: ${error.message}`;
-    alert(`중복 검사 중 오류가 발생했습니다.\n\n${error.message}`);
+    executeStatus.textContent = `Duplicate check failed: ${error.message}`;
+    alert(`An error occurred while checking duplicates.\n\n${error.message}`);
   } finally {
     duplicateCheckController = null;
     checkFiles.clear();
@@ -320,12 +320,12 @@ executeButton.addEventListener("click", async () => {
   executeStatus.className = "execute-status";
 
   if (!downloadDirectoryHandle || !libraryDirectoryHandle) {
-    alert("다운로드 폴더와 기존 패턴 폴더를 먼저 선택하세요.");
+    alert("Select the download and pattern folders first.");
     return;
   }
 
   if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) {
-    alert('Pattern Library에서 편집 중인 분류·대표 페이지를 먼저 저장하거나 취소하세요.');
+    alert('Save or cancel category and cover page edits in Pattern Library first.');
     setActiveView('library');
     return;
   }
@@ -333,7 +333,7 @@ executeButton.addEventListener("click", async () => {
   const activeFiles = downloadFiles.filter((file) => !file.excluded);
 
   if (activeFiles.length === 0) {
-    alert("정리할 PDF 파일이 없습니다.");
+    alert("No PDFs to organize.");
     return;
   }
 
@@ -342,7 +342,7 @@ executeButton.addEventListener("click", async () => {
   }
 
   if (!duplicateCheckComplete) {
-    alert("정리 실행 전에 중복 검사를 먼저 실행하세요.");
+    alert("Check duplicates before organizing files.");
     return;
   }
 
@@ -363,11 +363,11 @@ executeButton.addEventListener("click", async () => {
   ).length;
 
   const confirmed = window.confirm(
-    `실제 파일 정리를 실행합니다.\n\n` +
-    `이동 예정: ${moveCount}개\n` +
-    `완전 중복 다운로드본 삭제: ${duplicateCount}개\n` +
-    `보류: ${holdCount}개\n` +
-    `이번 작업에서 제외: ${excludedCount}개`
+    `Proceed with organizing files?\n\n` +
+    `Files to move: ${moveCount}\n` +
+    `Exact duplicate downloads to delete: ${duplicateCount}\n` +
+    `On hold: ${holdCount}\n` +
+    `Excluded from this run: ${excludedCount}`
   );
 
   if (!confirmed) {
@@ -377,11 +377,11 @@ executeButton.addEventListener("click", async () => {
   const executionLog = createExecutionLog();
 
   setOperationBusy(true);
-  executeStatus.textContent = "파일을 정리하는 중입니다...";
+  executeStatus.textContent = "Organizing files...";
 
   try {
     await saveReviewDraft();
-    if (!libraryCatalog || catalogError) throw new Error(catalogError || '패턴 폴더의 메타데이터를 먼저 연결하세요.');
+    if (!libraryCatalog || catalogError) throw new Error(catalogError || 'Load the pattern folder metadata first.');
     await assertSeparateFolders(downloadDirectoryHandle,libraryDirectoryHandle);
     await verifyCheckedFiles();
     const plans = await buildExecutionPlans();
@@ -422,7 +422,7 @@ executeButton.addEventListener("click", async () => {
     addActionLog(executionLog);
 
     executeStatus.textContent =
-      `정리 완료: 이동 ${plans.movePlans.length}개 / 완전 중복 삭제 ${plans.deletePlans.length}개 / 보류 ${holdCount}개 / 제외 ${excludedCount}개 · Pattern Library에서 미분석 PDF 텍스트 분석을 이어서 실행할 수 있습니다.`;
+      `Organization complete: ${plans.movePlans.length} moved / ${plans.deletePlans.length} exact duplicates deleted / ${holdCount} on hold / ${excludedCount} excluded. Continue with PDF text analysis in Pattern Library.`;
 
   } catch (error) {
     executionLog.status = "failed";
@@ -431,8 +431,8 @@ executeButton.addEventListener("click", async () => {
 
     console.error(error);
     executeStatus.className = "execute-status error";
-    executeStatus.textContent = `실행 실패: ${error.message}`;
-    alert(`정리 실행 중 오류가 발생했습니다.\n\n${error.message}`);
+    executeStatus.textContent = `Run failed: ${error.message}`;
+    alert(`An error occurred while organizing files.\n\n${error.message}`);
   } finally {
     try {
       await reloadLibraryData();
@@ -442,7 +442,7 @@ executeButton.addEventListener("click", async () => {
     } catch (error) {
       duplicateCheckComplete = false;
       executeStatus.className = "execute-status error";
-      executeStatus.textContent += ` / 남은 검토 갱신 실패: ${error.message}`;
+      executeStatus.textContent += ` / Could not refresh remaining reviews: ${error.message}`;
     }
     setOperationBusy(false);
   }

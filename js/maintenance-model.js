@@ -34,9 +34,9 @@ const MaintenanceModel=(()=>{
   }
   function relink(catalog,missingId,candidateId,sha256,verified){
     const next=structuredClone(catalog),old=next.patterns.find(p=>p.id===missingId),candidate=next.patterns.find(p=>p.id===candidateId);
-    if(!old||old.present||!candidate?.present||old.size!==candidate.size)throw new Error('복구 대상이 변경됐습니다. 목록을 새로고침하세요.');
-    if(verified&&(!old.sha256||old.sha256!==sha256))throw new Error('저장된 해시와 일치하지 않습니다.');
-    if(candidate.categorySource==='manual')throw new Error('후보 파일에 수동 분류가 있습니다. 기존 분류를 덮어쓰지 않습니다.');
+    if(!old||old.present||!candidate?.present||old.size!==candidate.size)throw new Error('The recovery target has changed. Refresh the library.');
+    if(verified&&(!old.sha256||old.sha256!==sha256))throw new Error('The hash does not match the saved hash.');
+    if(candidate.categorySource==='manual')throw new Error('The candidate has manual categories. Existing classifications will not be overwritten.');
     Object.assign(old,{path:candidate.path,size:candidate.size,lastModified:candidate.lastModified,present:true,sha256});
     // Keep the full displaced record for inspection/recovery, but never offer it as another missing file.
     candidate.present=false;candidate.mergedInto=old.id;

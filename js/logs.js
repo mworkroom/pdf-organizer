@@ -44,7 +44,7 @@ function renderActionLogs() {
 
   if (actionLogs.length === 0) {
     logList.innerHTML =
-      `<p class="empty">아직 작업 로그가 없습니다.</p>`;
+      `<p class="empty">No activity logs yet.</p>`;
     return;
   }
 
@@ -69,7 +69,7 @@ function renderActionLogs() {
     result.className =
       log.status === "failed" ? "log-result failed" : "log-result";
     result.textContent =
-      log.status === "failed" ? "실행 실패" : "정리 완료";
+      log.status === "failed" ? "Run failed" : "Organization complete";
 
     header.appendChild(date);
     header.appendChild(result);
@@ -77,19 +77,19 @@ function renderActionLogs() {
     const summary = document.createElement("div");
     summary.className = "log-summary";
     summary.textContent =
-      `이동 ${moved.length}개 / 중복 삭제 ${deleted.length}개 / 보류 ${held.length}개 / 제외 ${excluded.length}개`;
+      `${moved.length} moved / ${deleted.length} duplicates deleted / ${held.length} on hold / ${excluded.length} excluded`;
 
     entry.appendChild(header);
     entry.appendChild(summary);
 
     if (deleted.length > 0) {
-      const section = createLogSection("중복 삭제", "deleted");
+      const section = createLogSection("Duplicates deleted", "deleted");
 
       deleted.forEach((item) => {
         const line = document.createElement("div");
         line.className = "log-line deleted";
         line.textContent =
-          `삭제: ${item.file} → 동일 파일: ${item.sameAs}`;
+          `Deleted: ${item.file} → Identical file: ${item.sameAs}`;
         section.appendChild(line);
       });
 
@@ -97,7 +97,7 @@ function renderActionLogs() {
     }
 
     if (createdFolders.length > 0) {
-      const section = createLogSection("새 폴더 생성");
+      const section = createLogSection("Folders created");
 
       createdFolders.forEach((folderName) => {
         const line = document.createElement("div");
@@ -110,7 +110,7 @@ function renderActionLogs() {
     }
 
     if (moved.length > 0) {
-      const section = createLogSection("이동");
+      const section = createLogSection("Moved");
 
       moved.forEach((item) => {
         const line = document.createElement("div");
@@ -123,7 +123,7 @@ function renderActionLogs() {
     }
 
     if (held.length > 0) {
-      const section = createLogSection("보류");
+      const section = createLogSection("On hold");
 
       held.forEach((item) => {
         const line = document.createElement("div");
@@ -136,12 +136,12 @@ function renderActionLogs() {
     }
 
     if (excluded.length > 0) {
-      const section = createLogSection("이번 작업에서 제외");
+      const section = createLogSection("Excluded from this run");
 
       excluded.forEach((fileName) => {
         const line = document.createElement("div");
         line.className = "log-line";
-        line.textContent = `${fileName} — 다운로드 폴더에 남김`;
+        line.textContent = `${fileName} — Left in download folder`;
         section.appendChild(line);
       });
 
@@ -151,7 +151,7 @@ function renderActionLogs() {
     if (log.error) {
       const errorBox = document.createElement("div");
       errorBox.className = "log-error";
-      errorBox.textContent = `오류: ${log.error}`;
+      errorBox.textContent = `Error: ${log.error}`;
       entry.appendChild(errorBox);
     }
 
@@ -176,7 +176,7 @@ function createLogSection(title, extraClass = "") {
 }
 
 function formatLogTimestamp(timestamp) {
-  return new Intl.DateTimeFormat("ko-KR", {
+  return new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

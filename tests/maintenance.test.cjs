@@ -48,9 +48,9 @@ test('verified relink preserves identity, manual categories and representative p
 });
 test('mismatching hashes, manual candidate and stale missing state cannot be linked',()=>{
   const {context,run}=load();context.records=[{...record('old','Old.pdf',false),sha256:'a'.repeat(64)},record('new','Moved.pdf')];run('catalog.patterns=records');
-  assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","b".repeat(64),true)'),/해시/);
-  run('catalog.patterns[1].categorySource="manual"');assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","a".repeat(64),true)'),/수동/);
-  run('catalog.patterns[0].present=true');assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","a".repeat(64),true)'),/변경/);
+  assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","b".repeat(64),true)'),/hash/);
+  run('catalog.patterns[1].categorySource="manual"');assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","a".repeat(64),true)'),/manual categories/);
+  run('catalog.patterns[0].present=true');assert.throws(()=>run('MaintenanceModel.relink(catalog,"old","new","a".repeat(64),true)'),/changed/);
 });
 test('legacy explicit link stores a baseline hash without manufacturing old-content proof',()=>{
   const {context,run}=load();context.records=[record('old','Old.pdf',false),record('new','Moved.pdf')];run('catalog.patterns=records;var next=MaintenanceModel.relink(catalog,"old","new","c".repeat(64),false);CatalogModel.validate(next)');assert.equal(run('next.patterns[0].sha256'),'c'.repeat(64));assert.equal(run('catalog.patterns[0].present'),false);
@@ -61,5 +61,5 @@ test('restoring unchanged old path recovers its stable ID; replacement still get
 });
 test('additive JSON fields validate and category deletion also cleans analysis references',()=>{
   const {context,run}=load();context.pattern={...record('id','Text.pdf'),categorySource:'pdf-text',sha256:'d'.repeat(64),analysis:{version:1,status:'done',pages:3,matches:['hat'],at:'2026-10-15'}};run('catalog.patterns=[pattern];CatalogModel.validate(catalog);CatalogModel.removeCategory(catalog,"hat","unknown");CatalogModel.validate(catalog)');assert.equal(run('catalog.patterns[0].analysis.matches.length'),0);
-  run('catalog.patterns[0].sha256="invalid"');assert.throws(()=>run('CatalogModel.validate(catalog)'),/형식/);
+  run('catalog.patterns[0].sha256="invalid"');assert.throws(()=>run('CatalogModel.validate(catalog)'),/metadata format/);
 });

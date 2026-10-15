@@ -268,7 +268,7 @@ async function markIncomingBatchDuplicates(incomingFiles) {
         if (duplicate) {
           incomingFile.analysis = {
             action: "deleteDuplicate", message: "",
-            matchPath: `이번 다운로드 폴더의 ${duplicate.name}`
+            matchPath: `${duplicate.name} in this download folder`
           };
         } else {
           keptFiles.set(key, incomingFile);
@@ -308,7 +308,7 @@ function markNameConflicts(
       incomingFile.analysis = {
         action: "hold",
         message:
-          `같은 파일명의 PDF가 이미 있지만 내용이 다릅니다: ${matchingStoredFile.path}`,
+          `A PDF with the same filename has different content: ${matchingStoredFile.path}`,
         matchPath: ""
       };
     }
@@ -330,14 +330,14 @@ function markNameConflicts(
       previousFile.analysis = {
         action: "hold",
         message:
-          `이번 다운로드 안에서 같은 최종 파일명이 겹칩니다: ${targetName}`,
+          `Multiple downloads have the same destination filename: ${targetName}`,
         matchPath: ""
       };
 
       incomingFile.analysis = {
         action: "hold",
         message:
-          `이번 다운로드 안에서 같은 최종 파일명이 겹칩니다: ${targetName}`,
+          `Multiple downloads have the same destination filename: ${targetName}`,
         matchPath: ""
       };
     } else {
@@ -446,13 +446,13 @@ async function getFileDigest(fileHandle) {
 }
 
 function throwIfCheckCancelled() {
-  if (duplicateCheckController?.signal.aborted) throw new DOMException("검사 취소", "AbortError");
+  if (duplicateCheckController?.signal.aborted) throw new DOMException("Cancel check", "AbortError");
 }
 
 async function yieldCheck() {
   if (!duplicateCheckController) return;
   throwIfCheckCancelled();
-  executeStatus.textContent = `중복 검사 중: ${checkProgress.completed} / ${checkProgress.total}개 · 파일 내용 읽기 ${checkProgress.reads}개`;
+  executeStatus.textContent = `Checking duplicates: ${checkProgress.completed} / ${checkProgress.total} · Files read: ${checkProgress.reads}`;
   await new Promise(resolve => setTimeout(resolve, 0));
   throwIfCheckCancelled();
 }
@@ -477,11 +477,11 @@ async function assertCheckedFile(handle) {
     }
   }
   const checked = checkedFileSignatures.get(key);
-  if (!checked) throw new Error(`중복 검사 기록이 없는 파일입니다: ${handle.name}`);
+  if (!checked) throw new Error(`No duplicate check record for file: ${handle.name}`);
   const file = await handle.getFile();
   if (file.size !== checked.size || file.lastModified !== checked.lastModified) {
     duplicateCheckComplete = false;
-    throw new Error(`중복 검사 후 파일이 변경되었습니다. 폴더를 다시 읽고 검사하세요: ${handle.name}`);
+    throw new Error(`The file changed after the duplicate check. Reload the folder and check again: ${handle.name}`);
   }
   return file;
 }
@@ -675,7 +675,7 @@ async function validateMovePlans(plans) {
 
     if (destinationPaths.has(key)) {
       throw new Error(
-        `같은 위치에 같은 파일명이 두 번 생성됩니다: ${plan.targetFolderName}/${plan.targetName}`
+        `Two files would be created at the same destination: ${plan.targetFolderName}/${plan.targetName}`
       );
     }
 
@@ -686,7 +686,7 @@ async function validateMovePlans(plans) {
 
     if (alreadyExists) {
       throw new Error(
-        `중복 검사 후 저장 위치가 변경되었습니다: ${plan.targetFolderName}/${plan.targetName}`
+        `The destination changed after the duplicate check: ${plan.targetFolderName}/${plan.targetName}`
       );
     }
   }
@@ -715,7 +715,7 @@ async function copyFileThenRemoveOriginal(plan) {
   const sourceHash=cachedDigest&&cachedDigest.size===sourceFile.size&&cachedDigest.lastModified===sourceFile.lastModified?cachedDigest.hash:
     Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await sourceFile.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
   if (await fileExists(plan.targetDirectory, plan.targetName)) {
-    throw new Error(`저장 위치에 파일이 생겼습니다. 덮어쓰지 않습니다: ${plan.targetFolderName}/${plan.targetName}`);
+    throw new Error(`A file now exists at the destination. It will not be overwritten: ${plan.targetFolderName}/${plan.targetName}`);
   }
   let created = false;
   let metadataSaved = false;
@@ -734,7 +734,7 @@ async function copyFileThenRemoveOriginal(plan) {
     await writable.close();
 
     const copiedFile = await targetHandle.getFile();
-    if (copiedFile.size !== sourceFile.size) throw new Error("복사한 파일의 크기가 일치하지 않습니다.");
+    if (copiedFile.size !== sourceFile.size) throw new Error("The copied file size does not match.");
     await assertCheckedFile(sourceHandle);
     await persistMovedPattern(plan, copiedFile, sourceHash);
     metadataSaved = true;
@@ -747,7 +747,7 @@ async function copyFileThenRemoveOriginal(plan) {
       try {
         await plan.targetDirectory.removeEntry(plan.targetName);
       } catch (cleanupError) {
-        console.error("생성된 파일 정리 실패:", cleanupError);
+        console.error("Could not clean up the created file:", cleanupError);
       }
     }
 

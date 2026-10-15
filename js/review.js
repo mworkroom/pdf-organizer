@@ -58,9 +58,9 @@ function validateCompletenessAndFocus() {
 
   const first = incompleteFiles[0];
   alert(
-    `입력하지 않은 파일이 ${incompleteFiles.length}개 있습니다.\n\n` +
-    `첫 번째 누락: ${first.name}\n` +
-    `확인을 누르면 해당 위치로 이동합니다.`
+    `${incompleteFiles.length} files have missing details.\n\n` +
+    `First incomplete file: ${first.name}\n` +
+    `Select OK to go to that file.`
   );
 
   requestAnimationFrame(() => {
@@ -75,7 +75,7 @@ function validateCompletenessAndFocus() {
 }
 
 function renderDownloadFileList() {
-  downloadFileCount.textContent = `폴더에 남은 PDF ${getAllReviewFiles().filter(file => !file.completed).length}개 · 한 번에 최대 ${BATCH_LIMIT}개`;
+  downloadFileCount.textContent = `PDFs remaining: ${getAllReviewFiles().filter(file => !file.completed).length} · Up to ${BATCH_LIMIT} per batch`;
   downloadFileList.replaceChildren();
 }
 function renderDesignerFolders(folders) {
@@ -83,7 +83,7 @@ function renderDesignerFolders(folders) {
 
   if (folders.length === 0) {
     designerFolderList.innerHTML =
-      `<p class="empty">검색 결과가 없습니다.</p>`;
+      `<p class="empty">No results found.</p>`;
     return;
   }
 
@@ -109,7 +109,7 @@ function renderSelectedFile() {
   }
   const selected = downloadFiles.find(file => file.name === selectedReviewName);
   if (!selected) {
-    sortingList.innerHTML = '<p class="empty">검토할 파일을 선택하세요.</p>';
+    sortingList.innerHTML = '<p class="empty">Select a file to review.</p>';
     return;
   }
 
@@ -123,7 +123,7 @@ function renderSelectedFile() {
 
     const sourceFile = document.createElement("div");
     sourceFile.className = "source-file";
-    sourceFile.textContent = `원본 파일: ${file.name}`;
+    sourceFile.textContent = `Source file: ${file.name}`;
 
     const excludeLabel = document.createElement("label");
     excludeLabel.className = "exclude-label";
@@ -133,7 +133,7 @@ function renderSelectedFile() {
     excludeCheckbox.checked = file.excluded;
 
     const excludeText = document.createElement("span");
-    excludeText.textContent = "이번 작업에서 제외";
+    excludeText.textContent = "Exclude from this run";
 
     excludeLabel.appendChild(excludeCheckbox);
     excludeLabel.appendChild(excludeText);
@@ -142,7 +142,7 @@ function renderSelectedFile() {
     sourceHeader.appendChild(excludeLabel);
     const openButton = document.createElement("button");
     openButton.type = "button"; openButton.className = "secondary-button";
-    openButton.textContent = "PDF 열기";
+    openButton.textContent = "Open PDF";
     openButton.addEventListener("click", () => openReviewPdf(file));
     sourceHeader.appendChild(openButton);
 
@@ -155,12 +155,12 @@ function renderSelectedFile() {
     const destinationLabel = document.createElement("label");
     destinationLabel.className = "field-label";
     destinationLabel.textContent =
-      "저장 기준 디자이너명 / 기존 디자이너 검색";
+      "Destination designer / search existing designers";
 
     const destinationInput = document.createElement("input");
     destinationInput.className = "text-input";
     destinationInput.type = "text";
-    destinationInput.placeholder = "예: Knitree, 마요, 나무 Knitree";
+    destinationInput.placeholder = "e.g. Knitree, Mayo, Namu Knitree";
     destinationInput.value = file.destinationName;
     destinationInput.disabled = file.excluded;
     file.destinationInputElement = destinationInput;
@@ -170,8 +170,8 @@ function renderSelectedFile() {
 
     if (file.selectedFolder) {
       selectedLabel.textContent = file.autoLinkedAlias
-        ? `자동 연결됨: ${file.autoLinkedAlias} → ${file.selectedFolder}`
-        : `기존 디자이너 선택됨: ${file.selectedFolder}`;
+        ? `Alias matched: ${file.autoLinkedAlias} → ${file.selectedFolder}`
+        : `Existing designer selected: ${file.selectedFolder}`;
     }
 
     const suggestionsContainer = document.createElement("div");
@@ -186,24 +186,24 @@ function renderSelectedFile() {
 
     const sourceDesignerLabel = document.createElement("label");
     sourceDesignerLabel.className = "field-label";
-    sourceDesignerLabel.textContent = "파일명 속 디자이너 표기";
+    sourceDesignerLabel.textContent = "Designer name in source filename";
 
     const sourceDesignerInput = document.createElement("input");
     sourceDesignerInput.className = "text-input";
     sourceDesignerInput.type = "text";
-    sourceDesignerInput.placeholder = "예: Knitree, Anna-Sofia Vintersol";
+    sourceDesignerInput.placeholder = "e.g. Knitree, Anna-Sofia Vintersol";
     sourceDesignerInput.value = file.sourceDesignerName;
     sourceDesignerInput.disabled = file.excluded;
 
     const sourceDesignerHint = document.createElement("div");
     sourceDesignerHint.className = "field-hint";
     sourceDesignerHint.textContent =
-      "원본 파일명에서 제거할 이름입니다. 기존 디자이너를 선택한 뒤 이 표기를 연결로 저장할 수 있습니다.";
+      "This name is removed from the source filename. Select an existing designer to save this spelling as an alias.";
 
     const rememberButton = document.createElement("button");
     rememberButton.type = "button";
     rememberButton.className = "secondary-button remember-button";
-    rememberButton.textContent = "이 연결 기억";
+    rememberButton.textContent = "Remember alias";
     rememberButton.disabled =
       file.excluded || !getExistingFolderName(file);
 
@@ -217,12 +217,12 @@ function renderSelectedFile() {
 
     const patternLabel = document.createElement("label");
     patternLabel.className = "field-label";
-    patternLabel.textContent = "정리 후 패턴 파일명";
+    patternLabel.textContent = "Organized pattern filename";
 
     const patternInput = document.createElement("input");
     patternInput.className = "text-input";
     patternInput.type = "text";
-    patternInput.placeholder = "예: summer_top.pdf";
+    patternInput.placeholder = "e.g. summer_top.pdf";
     patternInput.value = file.patternFileName;
     patternInput.disabled = file.excluded;
     file.patternInputElement = patternInput;
@@ -230,7 +230,7 @@ function renderSelectedFile() {
     const resetButton = document.createElement("button");
     resetButton.type = "button";
     resetButton.className = "secondary-button";
-    resetButton.textContent = "자동 정리 다시 적용";
+    resetButton.textContent = "Reset automatic filename";
     resetButton.disabled = file.excluded;
 
     patternField.appendChild(patternLabel);
@@ -242,14 +242,14 @@ function renderSelectedFile() {
 
     const previewLabel = document.createElement("label");
     previewLabel.className = "field-label";
-    previewLabel.textContent = "저장 결과 미리보기";
+    previewLabel.textContent = "Destination preview";
 
     const preview = document.createElement("div");
     preview.className = "preview pending";
 
     const status = document.createElement("div");
     status.className = "row-status unchecked";
-    status.textContent = "중복 검사 전";
+    status.textContent = "Duplicate check required";
 
     file.previewElement = preview;
     file.statusElement = status;
@@ -404,7 +404,7 @@ function renderSuggestions(
     const noMatch = document.createElement("div");
     noMatch.className = "no-match";
     noMatch.textContent =
-      "기존 디자이너 없음 — Singles 파일 수에 따라 저장 위치를 계산합니다.";
+      "No existing designer. The destination depends on the number of Singles files.";
     container.appendChild(noMatch);
     return;
   }
@@ -427,7 +427,7 @@ function renderSuggestions(
       destinationInput.value = folderName;
 
       selectedLabel.textContent =
-        `기존 디자이너 선택됨: ${folderName}`;
+        `Existing designer selected: ${folderName}`;
 
       container.innerHTML = "";
       rememberButton.disabled = false;
@@ -458,7 +458,7 @@ function updateAllPreviews() {
   downloadFiles.forEach((file) => {
     updatePreview(file);
     updateRowStatus(file);
-    if (file.listDesignerElement) file.listDesignerElement.textContent = file.destinationName || "디자이너 미지정";
+    if (file.listDesignerElement) file.listDesignerElement.textContent = file.destinationName || "No designer assigned";
     if (file.listStatusElement) file.listStatusElement.textContent = reviewStatus(file);
   });
   updateBatchControls();
@@ -476,7 +476,7 @@ function updatePreview(file) {
   if (file.excluded) {
     preview.classList.add("excluded");
     preview.textContent =
-      "이번 작업에서 제외 — 다운로드 폴더에 그대로 남깁니다.";
+      "Excluded from this run. The file stays in the download folder.";
     return;
   }
 
@@ -487,7 +487,7 @@ function updatePreview(file) {
 
   if (!patternFileName) {
     preview.classList.add("pending");
-    preview.textContent = "패턴 파일명을 입력하세요.";
+    preview.textContent = "Enter a pattern filename.";
     return;
   }
 
@@ -501,7 +501,7 @@ function updatePreview(file) {
   if (!destinationName) {
     preview.classList.add("pending");
     preview.textContent =
-      "저장 기준 이름과 패턴 파일명을 입력하세요.";
+      "Enter a destination designer and pattern filename.";
     return;
   }
 
@@ -527,8 +527,8 @@ function updatePreview(file) {
   if (totalCount >= 3) {
     preview.classList.add("promote");
     preview.textContent =
-      `새 디자이너 폴더 생성 예정: ${destinationName}/\n` +
-      `기존 Singles 파일 ${existingSingles.length}개 + 이번 다운로드 ${countableIncoming.length}개 이동\n` +
+      `New designer folder to create: ${destinationName}/\n` +
+      `Move ${existingSingles.length} existing Singles files + ${countableIncoming.length} downloads\n` +
       `→ ${destinationName}/${patternFileName}`;
     return;
   }
@@ -536,7 +536,7 @@ function updatePreview(file) {
   preview.classList.add("single");
   preview.textContent =
     `${SINGLES_FOLDER_NAME}/${destinationName}_${patternFileName}\n` +
-    `현재 계산: 기존 Singles ${existingSingles.length}개 + 이번 다운로드 ${countableIncoming.length}개 = 총 ${totalCount}개`;
+    `Current total: ${existingSingles.length} existing Singles + ${countableIncoming.length} downloads = ${totalCount} files`;
 }
 
 function updateRowStatus(file) {
@@ -549,31 +549,31 @@ function updateRowStatus(file) {
   if (file.excluded) {
     status.className = "row-status excluded";
     status.textContent =
-      "이번 작업에서 제외 — 중복 검사 및 정리 실행 대상이 아닙니다.";
+      "Excluded from this run. This file will not be checked or organized.";
     return;
   }
 
   if (!duplicateCheckComplete || file.analysis.action === "unchecked") {
     status.className = "row-status unchecked";
-    status.textContent = "중복 검사 전";
+    status.textContent = "Duplicate check required";
     return;
   }
 
   if (file.analysis.action === "deleteDuplicate") {
     status.className = "row-status duplicate";
     status.textContent =
-      `완전 중복 파일 — 실행 시 새 다운로드본만 삭제\n` +
-      `이미 보관된 파일: ${file.analysis.matchPath}`;
+      `Exact duplicate. Only the new download will be deleted when organizing.\n` +
+      `Existing file: ${file.analysis.matchPath}`;
     return;
   }
 
   if (file.analysis.action === "hold") {
     status.className = "row-status hold";
     status.textContent =
-      `보류 — ${file.analysis.message}`;
+      `On hold — ${file.analysis.message}`;
     return;
   }
 
   status.className = "row-status move";
-  status.textContent = "이동 예정";
+  status.textContent = "Ready to move";
 }

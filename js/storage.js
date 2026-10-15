@@ -12,7 +12,7 @@ async function initializeDraft() {
       if (!ownsDraft) {
         draftLockedElsewhere = true;
         setOperationBusy(true);
-        draftSaveStatus.textContent = "다른 탭에서 검토 중입니다. 그 탭을 닫고 이 페이지를 새로고침하세요.";
+        draftSaveStatus.textContent = "A review is open in another tab. Close that tab and refresh this page.";
         return false;
       }
       window.addEventListener("pageshow", event => { if (event.persisted) window.location.reload(); });
@@ -21,16 +21,16 @@ async function initializeDraft() {
     if (pendingDraft) pendingDraft = normalizeReviewDraft(pendingDraft);
     if (pendingDraft?.files.length) {
       document.getElementById("draftRecoverySummary").textContent =
-        `${pendingDraft.downloadDirectory.name} · 저장된 검토 ${pendingDraft.files.length}개`;
+        `${pendingDraft.downloadDirectory.name} · Saved reviews: ${pendingDraft.files.length}`;
       draftRecovery.classList.remove("hidden");
-      draftSaveStatus.textContent = "이전 검토 내용을 이어서 작업할 수 있습니다.";
+      draftSaveStatus.textContent = "A saved review is available to resume.";
     } else {
       pendingDraft = null;
-      draftSaveStatus.textContent = "폴더를 선택하면 검토 내용을 자동 저장합니다.";
+      draftSaveStatus.textContent = "Select a folder to enable review autosave.";
     }
     return true;
   } catch (error) {
-    draftSaveStatus.textContent = `저장소 확인 실패: ${error.message}. 페이지를 다시 열어주세요.`;
+    draftSaveStatus.textContent = `Could not check storage: ${error.message}. Reopen this page.`;
     return false;
   }
 }
@@ -38,7 +38,7 @@ async function initializeDraft() {
 function scheduleDraftSave() {
   if (suppressDraftSave || !downloadDirectoryHandle) return;
   draftRevision++;
-  draftSaveStatus.textContent = "검토 내용 저장 중...";
+  draftSaveStatus.textContent = "Saving review...";
   clearTimeout(draftTimer);
   draftTimer = setTimeout(() => saveReviewDraft().catch(() => {}), 250);
 }
@@ -56,15 +56,15 @@ async function saveReviewDraft() {
     files: serializeBatchFiles()
   };
   const task = draftSaveChain.then(async () => {
-    if (!await draftReady) throw new Error("검토 저장소를 사용할 수 없습니다.");
+    if (!await draftReady) throw new Error("Review storage is unavailable.");
     await ReviewDraftStore.save(snapshot);
     savedDraftRevision = revision;
     if (draftRevision === revision) {
-      draftSaveStatus.textContent = "검토 내용 저장됨";
+      draftSaveStatus.textContent = "Review saved";
       retryDraftSaveButton.classList.add("hidden");
     }
   }).catch(error => {
-    draftSaveStatus.textContent = `검토 내용 저장 실패: ${error.message}`;
+    draftSaveStatus.textContent = `Could not save review: ${error.message}`;
     retryDraftSaveButton.classList.remove("hidden");
     throw error;
   });
@@ -73,12 +73,12 @@ async function saveReviewDraft() {
 }
 
 async function prepareFolderChange(handle, currentHandle) {
-  if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) throw new Error('편집 중인 분류·대표 페이지를 먼저 저장하거나 취소하세요.');
-  if (!await draftReady) throw new Error("검토 저장소를 확인한 후 다시 시도하세요.");
+  if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) throw new Error('Save or cancel category and cover page edits first.');
+  if (!await draftReady) throw new Error("Wait for the review storage check, then try again.");
   await saveReviewDraft();
   const sameFolder = currentHandle && await currentHandle.isSameEntry(handle);
   if ((!sameFolder && currentHandle && getAllReviewFiles().length) || pendingDraft?.files.length) {
-    if (!window.confirm("다른 폴더로 시작하면 이전 검토 복구본을 새 작업으로 교체합니다. 계속할까요?")) return false;
+    if (!window.confirm("Starting with a different folder replaces the saved review with a new one. Continue?")) return false;
   }
   pendingDraft = null;
   draftRecovery.classList.add("hidden");
@@ -90,7 +90,7 @@ async function assertSeparateFolders(downloads,library){
   const same=await downloads.isSameEntry(library);
   const libraryContains=library.resolve?await library.resolve(downloads):null;
   const downloadsContains=downloads.resolve?await downloads.resolve(library):null;
-  if(same||libraryContains!==null||downloadsContains!==null)throw new Error('다운로드 폴더와 패턴 폴더는 서로 다른 위치여야 합니다. 한 폴더를 다른 폴더 안에 두지 마세요.');
+  if(same||libraryContains!==null||downloadsContains!==null)throw new Error('The download and pattern folders must be separate locations. Neither folder may contain the other.');
 }
 
 function captureFolderReview() {
@@ -117,7 +117,7 @@ function restoreFolderReview(previous) {
   digestCache.clear();
   invalidateDuplicateCheck();
   renderDownloadFileList(); renderSortingRows(); renderDesignerFolders(designerFolders); renderAliasList();
-  executeStatus.textContent = '폴더를 연결하지 못해 이전 검토를 유지했습니다. 정리 전에 중복 검사를 다시 실행하세요.';
+  executeStatus.textContent = 'Could not connect the folders. The previous review is preserved. Check duplicates again before organizing.';
   renderCatalogUI();
 }
 
@@ -136,7 +136,7 @@ async function restoreReviewDraft() {
     for (const handle of [draft.downloadDirectory, draft.libraryDirectory].filter(Boolean)) {
       let permission = await handle.queryPermission({ mode: "readwrite" });
       if (permission !== "granted") permission = await handle.requestPermission({ mode: "readwrite" });
-      if (permission !== "granted") throw new Error("선택 폴더의 접근 권한이 필요합니다. 권한을 허용한 뒤 다시 시도하세요.");
+      if (permission !== "granted") throw new Error("Access to the selected folders is required. Grant permission and try again.");
     }
     downloadDirectoryHandle = draft.downloadDirectory;
     libraryDirectoryHandle = draft.libraryDirectory;
@@ -159,14 +159,14 @@ async function restoreReviewDraft() {
       }
       restored++;
     }
-    downloadFolderName.textContent = `선택한 폴더: ${downloadDirectoryHandle.name}`;
-    libraryFolderName.textContent = libraryDirectoryHandle ? `선택한 폴더: ${libraryDirectoryHandle.name}` : "";
+    downloadFolderName.textContent = `Selected folder: ${downloadDirectoryHandle.name}`;
+    libraryFolderName.textContent = libraryDirectoryHandle ? `Selected folder: ${libraryDirectoryHandle.name}` : "";
     restoreBatchMembership(getAllReviewFiles(), draft);
     renderDownloadFileList();
     renderSortingRows();
     loaded = true;
     duplicateCheckComplete = false;
-    executeStatus.textContent = `검토 ${restored}개 복구 / 변경된 파일 ${changed}개는 새로 검토합니다. 정리 전에 중복 검사를 다시 실행하세요.`;
+    executeStatus.textContent = `Restored ${restored} reviews. Review ${changed} changed files again. Check duplicates before organizing.`;
     pendingDraft = null;
     draftRecovery.classList.add("hidden");
     suppressDraftSave = false;
@@ -192,7 +192,7 @@ async function restoreReviewDraft() {
       renderSortingRows();
       renderDesignerFolders(designerFolders);
     }
-    draftSaveStatus.textContent = `검토 복구 실패: ${error.message}`;
+    draftSaveStatus.textContent = `Could not restore review: ${error.message}`;
   } finally {
     suppressDraftSave = false;
     setOperationBusy(false);

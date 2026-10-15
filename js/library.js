@@ -23,7 +23,7 @@ function setActiveView(view) {
 function openReviewPdf(file) {
   const viewer = window.open("about:blank", "_blank");
   if (!viewer) {
-    pdfOpenStatus("PDF를 열려면 이 사이트의 팝업을 허용하세요.");
+    pdfOpenStatus("Allow pop-ups for this site to open PDFs.");
     return;
   }
   viewer.opener = null;
@@ -34,7 +34,7 @@ function openReviewPdf(file) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }).catch(error => {
     viewer.close();
-    pdfOpenStatus(`PDF를 열지 못했습니다: ${error.message}`);
+    pdfOpenStatus(`Could not open PDF: ${error.message}`);
   });
 }
 
@@ -82,14 +82,14 @@ async function reloadLibraryData() {
     );
 
     singlesFileCount.textContent =
-      `${SINGLES_FOLDER_NAME} PDF 파일 ${singlesPdfNames.length}개`;
+      `${singlesPdfNames.length} PDFs in ${SINGLES_FOLDER_NAME}`;
   } else {
     singlesFileCount.textContent =
-      `${SINGLES_FOLDER_NAME} 폴더 없음 — 정리 실행 시 새로 생성됩니다.`;
+      `${SINGLES_FOLDER_NAME} does not exist yet. It will be created when organizing files.`;
   }
 
   designerFolderCount.textContent =
-    `디자이너 폴더 ${designerFolders.length}개`;
+    `Designer folders: ${designerFolders.length}`;
 
   designerSearch.disabled = false;
 

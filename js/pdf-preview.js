@@ -1,7 +1,7 @@
 const PdfPreview=(()=>{
   let modulePromise, serial=Promise.resolve();
   let active=0,maxActive=0,reads=0;
-  const aborted=()=>new DOMException('미리보기 요청 취소','AbortError');
+  const aborted=()=>new DOMException('Preview request canceled','AbortError');
   function library(){
     if(!modulePromise)modulePromise=import(new URL('vendor/pdfjs/build/pdf.min.mjs',document.baseURI).href).then(module=>{
       module.GlobalWorkerOptions.workerSrc=new URL('vendor/pdfjs/build/pdf.worker.min.mjs',document.baseURI).href;return module;
@@ -11,7 +11,7 @@ const PdfPreview=(()=>{
   async function draw(handle,pattern,pageNumber,signal,extract=false){
     if(signal?.aborted)throw aborted();
     const file=await handle.getFile();
-    if(file.size!==pattern.size||file.lastModified!==pattern.lastModified)throw new Error('파일이 변경됐습니다. 패턴 목록을 새로고침하세요.');
+    if(file.size!==pattern.size||file.lastModified!==pattern.lastModified)throw new Error('The file has changed. Refresh the library.');
     const pdfjs=await library();
     if(signal?.aborted)throw aborted();
     const bytes=new Uint8Array(await file.arrayBuffer());
@@ -50,7 +50,7 @@ const PdfPreview=(()=>{
         if(signal?.aborted)throw aborted();
         return {pages,sha256};
       }
-      if(!Number.isSafeInteger(pageNumber)||pageNumber<1||pageNumber>pdf.numPages)throw Object.assign(new Error(`대표 페이지는 1~${pdf.numPages} 사이로 선택하세요.`),{numPages:pdf.numPages});
+      if(!Number.isSafeInteger(pageNumber)||pageNumber<1||pageNumber>pdf.numPages)throw Object.assign(new Error(`Choose a cover page from 1~${pdf.numPages}.`),{numPages:pdf.numPages});
       const page=await pdf.getPage(pageNumber),original=page.getViewport({scale:1});
       const viewport=page.getViewport({scale:Math.min(384/original.width,480/original.height)});
       canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
@@ -58,7 +58,7 @@ const PdfPreview=(()=>{
       if(signal?.aborted)throw aborted();
       const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',0.85));
       if(signal?.aborted)throw aborted();
-      if(!blob)throw new Error('미리보기 이미지를 만들지 못했습니다.');
+      if(!blob)throw new Error('Could not create a preview image.');
       return {blob,pages:pdf.numPages,page:pageNumber};
     }finally{
       signal?.removeEventListener('abort',cancel);await task.destroy();

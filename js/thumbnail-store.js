@@ -6,7 +6,7 @@ const ThumbnailStore=(()=>{
       const request=indexedDB.open('pdfOrganizerPreviewCache',1);
       request.onupgradeneeded=()=>request.result.createObjectStore('previews',{keyPath:'key'});
       request.onsuccess=()=>{request.result.onversionchange=()=>request.result.close();resolve(request.result);};
-      request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('캐시 저장소가 사용 중입니다.'));
+      request.onerror=()=>reject(request.error);request.onblocked=()=>reject(new Error('The cache storage is in use.'));
     }).catch(error=>{opening=null;unavailable=true;throw error;});
     return opening;
   }
@@ -15,7 +15,7 @@ const ThumbnailStore=(()=>{
     return new Promise((resolve,reject)=>{
       const tx=db.transaction('previews','readwrite'),store=tx.objectStore('previews'),request=store.get(key);let result;
       request.onsuccess=()=>{result=request.result;if(result){result.accessedAt=Date.now();store.put(result);}};
-      tx.oncomplete=()=>resolve(result);tx.onerror=tx.onabort=()=>reject(tx.error||new Error('캐시 읽기 실패'));
+      tx.oncomplete=()=>resolve(result);tx.onerror=tx.onabort=()=>reject(tx.error||new Error('Could not read cache'));
     });
   }
   async function put(key,value){
@@ -30,7 +30,7 @@ const ThumbnailStore=(()=>{
         let bytes=entries.reduce((sum,item)=>sum+item.blob.size,0),count=entries.length;
         for(const entry of entries){if(count<=limit&&bytes<=byteLimit)break;store.delete(entry.key);bytes-=entry.blob.size;count--;}
       };
-      tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>{unavailable=true;reject(tx.error||new Error('캐시 저장 실패'));};
+      tx.oncomplete=()=>resolve();tx.onerror=tx.onabort=()=>{unavailable=true;reject(tx.error||new Error('Could not save cache'));};
     });
   }
   async function clear(){const db=await open();return new Promise((resolve,reject)=>{const tx=db.transaction('previews','readwrite');tx.objectStore('previews').clear();tx.oncomplete=()=>{unavailable=false;resolve();};tx.onerror=tx.onabort=()=>reject(tx.error);});}

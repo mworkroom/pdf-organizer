@@ -28,7 +28,7 @@ const CatalogModel = (() => {
     return categoryIds(matches,categories);
   }
   function validate(value) {
-    const fail=()=>{throw new Error('메타데이터 형식이 올바르지 않거나 지원하지 않는 버전입니다. 원본 JSON을 덮어쓰지 않습니다.');};
+    const fail=()=>{throw new Error('Invalid metadata format or unsupported version. The original JSON will not be overwritten.');};
     if(!value||value.version!==1||!Number.isSafeInteger(value.revision)||value.revision<0||typeof value.libraryId!=='string'||!value.libraryId||!Array.isArray(value.categories)||!Array.isArray(value.patterns))fail();
     const ids=new Set(), names=new Set(), patterns=new Set(), livePaths=new Set();
     for(const c of value.categories){
@@ -65,8 +65,8 @@ const CatalogModel = (() => {
     return next;
   }
   function removeCategory(catalog, id, replacement) {
-    if(['unknown','other'].includes(id))throw new Error('Other와 Unknown은 삭제할 수 없습니다.');
-    if(id===replacement||!catalog.categories.some(c=>c.id===replacement))throw new Error('대체 카테고리를 선택하세요.');
+    if(['unknown','other'].includes(id))throw new Error('Other and Unknown cannot be deleted.');
+    if(id===replacement||!catalog.categories.some(c=>c.id===replacement))throw new Error('Select a replacement category.');
     catalog.categories=catalog.categories.filter(c=>c.id!==id);
     for(const p of catalog.patterns)if(p.analysis)p.analysis.matches=p.analysis.matches.filter(c=>c!==id);
     for(const p of catalog.patterns){

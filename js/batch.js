@@ -24,17 +24,17 @@ function serializeBatchFiles() {
 
 function normalizeReviewDraft(draft) {
   if (!draft || ![1, 2].includes(draft.version) || !Array.isArray(draft.files)) {
-    throw new Error("지원하지 않는 검토 저장 형식입니다. 저장 내용을 덮어쓰지 않습니다.");
+    throw new Error("Unsupported review format. Saved data will not be overwritten.");
   }
   const names = new Set();
   const files = draft.files.map((file, index) => {
-    if (typeof file.name !== "string" || names.has(file.name)) throw new Error("복구본의 파일 목록을 확인할 수 없습니다.");
+    if (typeof file.name !== "string" || names.has(file.name)) throw new Error("The file list in the saved review is invalid.");
     names.add(file.name);
     const role = draft.version === 1 ? (index < BATCH_LIMIT ? "current" : "queued") : file.role;
-    if (!["current", "queued", "deferred"].includes(role)) throw new Error("복구본의 작업 묶음 정보가 올바르지 않습니다.");
+    if (!["current", "queued", "deferred"].includes(role)) throw new Error("The batch information in the saved review is invalid.");
     return { ...file, role, specialFolderKey: "singles" };
   });
-  if (files.filter(file => file.role === "current").length > BATCH_LIMIT) throw new Error("저장된 작업 묶음이 100개를 초과합니다.");
+  if (files.filter(file => file.role === "current").length > BATCH_LIMIT) throw new Error("The saved batch exceeds 100 files.");
   return { ...draft, files };
 }
 
@@ -45,7 +45,7 @@ function restoreBatchMembership(records, draft) {
     const file = byName.get(saved.name);
     if (!file) continue;
     const target = saved.role === "current" ? downloadFiles : saved.role === "queued" ? queuedDownloadFiles : deferredDownloadFiles;
-    file.deferredReason = saved.role === "deferred" ? (saved.deferredReason || "보류") : "";
+    file.deferredReason = saved.role === "deferred" ? (saved.deferredReason || "On hold") : "";
     target.push(file);
     byName.delete(saved.name);
   }
@@ -59,7 +59,7 @@ function restoreBatchMembership(records, draft) {
 
 function finishCurrentBatch() {
   for (const file of downloadFiles.filter(file => !file.completed)) {
-    file.deferredReason = file.excluded ? "이번 묶음에서 제외" : (file.analysis.message || "보류");
+    file.deferredReason = file.excluded ? "Excluded from this batch" : (file.analysis.message || "On hold");
     deferredDownloadFiles.push(file);
   }
   downloadFiles = [];
@@ -93,7 +93,7 @@ async function startNextBatch(fromDeferred = false) {
     scheduleDraftSave();
     await saveReviewDraft();
   } catch (error) {
-    executeStatus.textContent = `다음 작업을 시작하지 못했습니다: ${error.message}`;
+    executeStatus.textContent = `Could not start the next batch: ${error.message}`;
   } finally { setOperationBusy(false); updateBatchControls(); }
 }
 
@@ -110,12 +110,12 @@ async function deferCurrentBatch() {
     scheduleDraftSave();
     await saveReviewDraft();
     duplicateCheckComplete = false;
-    executeStatus.textContent = '현재 묶음을 보류했습니다. 실제 파일은 그대로 남아 있습니다.';
+    executeStatus.textContent = 'Batch deferred. Files remain in their original locations.';
   } catch (error) {
     downloadFiles = previous.files; deferredDownloadFiles = previous.deferred;
     selectedReviewName = previous.name; reviewSelections = previous.selections;
     downloadFiles.forEach((file, index) => file.deferredReason = previous.reasons[index]);
-    executeStatus.textContent = `묶음을 보류하지 못했습니다: ${error.message}`;
+    executeStatus.textContent = `Could not defer the batch: ${error.message}`;
   } finally {
     renderDownloadFileList(); renderSortingRows(); setOperationBusy(false);
   }
@@ -163,22 +163,22 @@ function selectReviewFile(name) {
 }
 
 function reviewStatus(file) {
-  if (file.excluded) return "제외";
-  if (!file.destinationName.trim() || !ensurePdfExtension(file.patternFileName.trim())) return "입력 필요";
-  return { move: "이동 예정", hold: "보류", deleteDuplicate: "중복 삭제" }[file.analysis.action] || "검사 전";
+  if (file.excluded) return "Excluded";
+  if (!file.destinationName.trim() || !ensurePdfExtension(file.patternFileName.trim())) return "Details needed";
+  return { move: "Ready to move", hold: "On hold", deleteDuplicate: "Delete duplicate" }[file.analysis.action] || "Not checked";
 }
 
 function renderReviewFileList() {
   const list = document.getElementById("reviewFileList");
   const previousScroll = list.scrollTop;
   list.replaceChildren();
-  if (!downloadFiles.length) list.innerHTML = '<p class="empty">현재 묶음이 끝났습니다. 다음 묶음을 열거나 보류 파일을 다시 검토하세요.</p>';
+  if (!downloadFiles.length) list.innerHTML = '<p class="empty">Batch complete. Open the next batch or review deferred files.</p>';
   for (const file of downloadFiles) {
     const row = document.createElement("div");
     row.className = "review-list-row" + (file.name === selectedReviewName ? " selected" : "");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox"; checkbox.checked = reviewSelections.has(file.name);
-    checkbox.setAttribute("aria-label", `${file.name} 일괄 작업 선택`);
+    checkbox.setAttribute("aria-label", `Select ${file.name} for bulk actions`);
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) reviewSelections.add(file.name); else reviewSelections.delete(file.name);
       updateBatchControls(); scheduleDraftSave();
@@ -187,7 +187,7 @@ function renderReviewFileList() {
     button.type = "button"; button.className = "review-file-button";
     button.setAttribute("aria-current", String(file.name === selectedReviewName));
     const name = document.createElement("span"); name.className = "review-file-name"; name.textContent = file.name;
-    const designer = document.createElement("span"); designer.className = "review-file-designer"; designer.textContent = file.destinationName || "디자이너 미지정";
+    const designer = document.createElement("span"); designer.className = "review-file-designer"; designer.textContent = file.destinationName || "No designer assigned";
     const status = document.createElement("span"); status.className = "review-file-status"; status.textContent = reviewStatus(file);
     file.listDesignerElement = designer; file.listStatusElement = status;
     button.append(name, designer, status);
@@ -208,10 +208,10 @@ function renderReviewFileList() {
 }
 
 function updateBatchControls() {
-  document.getElementById("batchTitle").textContent = `작업 묶음 ${batchNumber}`;
-  document.getElementById("batchSummary").textContent = `현재 ${downloadFiles.length}개 · 대기 ${queuedDownloadFiles.length}개 · 보류·제외 ${deferredDownloadFiles.length}개`;
+  document.getElementById("batchTitle").textContent = `Batch ${batchNumber}`;
+  document.getElementById("batchSummary").textContent = `Current: ${downloadFiles.length} · Queued: ${queuedDownloadFiles.length} · Deferred/excluded: ${deferredDownloadFiles.length}`;
   const count = reviewSelections.size;
-  document.getElementById("reviewSelectionCount").textContent = `선택 ${count}개`;
+  document.getElementById("reviewSelectionCount").textContent = `${count} selected`;
   const all = document.getElementById("selectAllReviewFiles");
   all.checked = Boolean(downloadFiles.length) && count === downloadFiles.length;
   all.indeterminate = count > 0 && count < downloadFiles.length;
@@ -229,18 +229,18 @@ function updateBatchControls() {
   }
   const deferredPanel = document.getElementById("deferredPanel");
   deferredPanel.classList.toggle("hidden", !deferredDownloadFiles.length);
-  document.getElementById("deferredCount").textContent = `(${deferredDownloadFiles.length}개)`;
+  document.getElementById("deferredCount").textContent = `(${deferredDownloadFiles.length})`;
   const deferredList = document.getElementById("deferredFileList");
   deferredList.replaceChildren();
   for (const file of deferredDownloadFiles.slice(0, 20)) {
     const item = document.createElement("div"); item.className = "deferred-file";
-    item.textContent = `${file.name} — ${file.deferredReason || "보류"}`; deferredList.append(item);
+    item.textContent = `${file.name} — ${file.deferredReason || "On hold"}`; deferredList.append(item);
   }
   if (deferredDownloadFiles.length > 20) {
-    const more = document.createElement("p"); more.className = "note"; more.textContent = `외 ${deferredDownloadFiles.length - 20}개 · 다시 검토는 최대 100개씩 열립니다.`; deferredList.append(more);
+    const more = document.createElement("p"); more.className = "note"; more.textContent = `${deferredDownloadFiles.length - 20} more. Review up to 100 files at a time.`; deferredList.append(more);
   }
 }
 
 function assertBatchLimit() {
-  if (downloadFiles.length > BATCH_LIMIT) throw new Error("한 번에 최대 100개만 정리할 수 있습니다.");
+  if (downloadFiles.length > BATCH_LIMIT) throw new Error("Up to 100 files can be organized at a time.");
 }

@@ -15,9 +15,9 @@
   };
   const panel = document.createElement('section');
   panel.className = 'panel';
-  panel.innerHTML = '<h2>로컬 QA 도구</h2><p class="note">이 화면의 샘플은 브라우저 임시 저장소에만 생성됩니다.</p><button id="qaSeed400">샘플 400개 준비</button> <button id="qaSeed200">샘플 200개 준비</button> <button id="qaLegacy">구버전 400개 복구본 준비</button> <button id="qaBreakSave">저장 실패 주입</button> <button id="qaBreakMove">이동 실패 주입</button> <button id="qaFolderFailure">폴더 읽기 실패</button> <button id="qaFix">오류 주입 해제</button> <button id="qaCleanup">샘플 작업 종료</button><output id="qaReport" style="display:block;white-space:pre-wrap;margin-top:16px;font-size:14px"></output>';
+  panel.innerHTML = '<h2>Local QA tools</h2><p class="note">Samples are created only in temporary browser storage.</p><button id="qaSeed400">Prepare 400 samples</button> <button id="qaSeed200">Prepare 200 samples</button> <button id="qaLegacy">Prepare 400 legacy reviews</button> <button id="qaBreakSave">Inject save failure</button> <button id="qaBreakMove">Inject move failure</button> <button id="qaFolderFailure">Folder read failure</button> <button id="qaFix">Clear injected errors</button> <button id="qaCleanup">End sample session</button><output id="qaReport" style="display:block;white-space:pre-wrap;margin-top:16px;font-size:14px"></output>';
   document.body.append(panel);
-  const categorySeed=document.createElement('button');categorySeed.id='qaCategorySeed';categorySeed.textContent='분류 샘플 준비';panel.insertBefore(categorySeed,reportPlaceholder());
+  const categorySeed=document.createElement('button');categorySeed.id='qaCategorySeed';categorySeed.textContent='Prepare category samples';panel.insertBefore(categorySeed,reportPlaceholder());
   function reportPlaceholder(){return panel.querySelector('#qaReport');}
   const report = panel.querySelector('#qaReport');
   let lastError = '';
@@ -27,10 +27,10 @@
     if(!downloadDirectoryHandle&&pendingDraft?.downloadDirectory){
       const origin=await navigator.storage.getDirectory();let known=false;
       for(const name of fixtureRoots){if(!/^pdf-organizer-qa-\d+$/.test(name))continue;try{const dir=await (await origin.getDirectoryHandle(name)).getDirectoryHandle('Downloads');if(await dir.isSameEntry(pendingDraft.downloadDirectory))known=true;}catch{}}
-      if(!known)throw new Error('실제 폴더의 검토 복구본에는 QA 도구를 적용하지 않습니다.');
+      if(!known)throw new Error('QA tools cannot be applied to reviews from real folders.');
     }
     if (downloadDirectoryHandle && !fixtureDownloads) await recoverFixtureHandle();
-    if (downloadDirectoryHandle && (!fixtureDownloads || !await fixtureDownloads.isSameEntry(downloadDirectoryHandle))) throw new Error('실제 폴더에는 QA 도구를 적용하지 않습니다.');
+    if (downloadDirectoryHandle && (!fixtureDownloads || !await fixtureDownloads.isSameEntry(downloadDirectoryHandle))) throw new Error('QA tools cannot be applied to real folders.');
   }
   async function recoverFixtureHandle() {
     const origin=await navigator.storage.getDirectory();
@@ -91,8 +91,8 @@
     localStorage.setItem(ALIAS_STORAGE_KEY, JSON.stringify(designerAliases));
     await reloadLibraryData(); await reloadDownloadData();
     renderAliasList(); renderDesignerFolders(designerFolders);
-    downloadFolderName.textContent = '선택한 폴더: Downloads';
-    libraryFolderName.textContent = '선택한 폴더: Patterns';
+    downloadFolderName.textContent = 'Selected folder: Downloads';
+    libraryFolderName.textContent = 'Selected folder: Patterns';
     setActiveView('organize'); renderSortingRows();
     executeStatus.className='execute-status';executeStatus.textContent='';
     suppressDraftSave = false;
@@ -116,7 +116,7 @@
     const special=await libraryDirectoryHandle.getDirectoryHandle('!Special',{create:true});const nested=await special.getDirectoryHandle('Nested',{create:true});await put(nested,'Cowl.pdf');
     await reloadLibraryData();
   });
-  const gallerySeed=document.createElement('button');gallerySeed.id='qaGallerySeed';gallerySeed.textContent='갤러리 샘플 131개 준비';panel.insertBefore(gallerySeed,report);
+  const gallerySeed=document.createElement('button');gallerySeed.id='qaGallerySeed';gallerySeed.textContent='Prepare 131 gallery samples';panel.insertBefore(gallerySeed,report);
   gallerySeed.onclick=wrap(async()=>{
     await seed(0);await guard();
     const put=async(dir,name,content)=>{const handle=await dir.getFileHandle(name,{create:true});const writable=await handle.createWritable();await writable.write(content);await writable.close();};
@@ -141,7 +141,7 @@
     data+=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`+offsets.slice(1).map(o=>`${String(o).padStart(10,'0')} 00000 n \n`).join('')+`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n%`;
     return data+'x'.repeat(65536-data.length);
   };
-  const maintenanceSeed=document.createElement('button');maintenanceSeed.textContent='분석·복구 샘플 준비';panel.insertBefore(maintenanceSeed,report);
+  const maintenanceSeed=document.createElement('button');maintenanceSeed.textContent='Prepare analysis and recovery samples';panel.insertBefore(maintenanceSeed,report);
   maintenanceSeed.onclick=wrap(async()=>{
     await seed(0);await guard();persistCatalog=realPersistCatalog;
     const designer=await libraryDirectoryHandle.getDirectoryHandle('Designer');await designer.removeEntry('Pattern_001.pdf');
@@ -153,26 +153,26 @@
     const old=await libraryDirectoryHandle.getFileHandle('Legacy.pdf'),file=await old.getFile(),target=await libraryDirectoryHandle.getFileHandle('Legacy_Renamed.pdf',{create:true}),writer=await target.createWritable();await writer.write(file);await writer.close();await libraryDirectoryHandle.removeEntry('Legacy.pdf');
     await persistCatalog(next);await loadLibraryCatalog();repairMissingId='';repairCandidateId='';repairProof=null;maintenanceMessage='';renderCatalogUI();
   });
-  const pauseAfterOne=document.createElement('button');pauseAfterOne.textContent='분석 1개 후 일시정지 준비';panel.insertBefore(pauseAfterOne,report);
+  const pauseAfterOne=document.createElement('button');pauseAfterOne.textContent='Pause after analyzing one file';panel.insertBefore(pauseAfterOne,report);
   pauseAfterOne.onclick=wrap(async()=>{await guard();persistCatalog=async next=>{await realPersistCatalog(next);if(analysisRun){persistCatalog=realPersistCatalog;analysisRun.controller.abort();}};});
-  const renamePreserved=document.createElement('button');renamePreserved.textContent='샘플 외부 이동·중복 후보 만들기';panel.insertBefore(renamePreserved,report);
+  const renamePreserved=document.createElement('button');renamePreserved.textContent='Create moved samples and duplicate candidates';panel.insertBefore(renamePreserved,report);
   renamePreserved.onclick=wrap(async()=>{
     await guard();const old=await libraryDirectoryHandle.getFileHandle('Preserved.pdf'),file=await old.getFile();
     const folder=await libraryDirectoryHandle.getDirectoryHandle('Moved',{create:true});
     for(const name of ['Renamed.pdf','Same_Copy.pdf']){const handle=await folder.getFileHandle(name,{create:true}),writer=await handle.createWritable();await writer.write(file);await writer.close();}
     await libraryDirectoryHandle.removeEntry('Preserved.pdf');await loadLibraryCatalog();
   });
-  const reconnect=document.createElement('button');reconnect.textContent='샘플 라이브러리 다시 연결';panel.insertBefore(reconnect,report);
+  const reconnect=document.createElement('button');reconnect.textContent='Reconnect sample library';panel.insertBefore(reconnect,report);
   reconnect.onclick=wrap(async()=>{
-    await draftReady;await guard();const name=fixtureRoots.at(-1);if(!/^pdf-organizer-qa-\d+$/.test(name))throw new Error('샘플 폴더가 없습니다.');
+    await draftReady;await guard();const name=fixtureRoots.at(-1);if(!/^pdf-organizer-qa-\d+$/.test(name))throw new Error('No sample folder available.');
     const root=await (await navigator.storage.getDirectory()).getDirectoryHandle(name);libraryDirectoryHandle=await root.getDirectoryHandle('Patterns');downloadDirectoryHandle=await root.getDirectoryHandle('Downloads');fixtureDownloads=downloadDirectoryHandle;
-    resetBatchState();await reloadLibraryData();await reloadDownloadData();libraryFolderName.textContent='선택한 폴더: Patterns';downloadFolderName.textContent='선택한 폴더: Downloads';setActiveView('library');
+    resetBatchState();await reloadLibraryData();await reloadDownloadData();libraryFolderName.textContent='Selected folder: Patterns';downloadFolderName.textContent='Selected folder: Downloads';setActiveView('library');
   });
-  const metadataFail=document.createElement('button');metadataFail.id='qaBreakCatalog';metadataFail.textContent='메타데이터 저장 실패 주입';panel.insertBefore(metadataFail,report);
-  metadataFail.onclick=wrap(async()=>{await guard();writeCatalogText=async(root,name,value)=>{if(root===catalogRoot&&name===CATALOG_FILE_NAME)throw new Error('QA 메타데이터 저장 실패');return realCatalogWrite(root,name,value);};});
-  const jsonReload=document.createElement('button');jsonReload.id='qaReloadJson';jsonReload.textContent='브라우저 복구본 없이 JSON 다시 연결';panel.insertBefore(jsonReload,report);
+  const metadataFail=document.createElement('button');metadataFail.id='qaBreakCatalog';metadataFail.textContent='Inject metadata save failure';panel.insertBefore(metadataFail,report);
+  metadataFail.onclick=wrap(async()=>{await guard();writeCatalogText=async(root,name,value)=>{if(root===catalogRoot&&name===CATALOG_FILE_NAME)throw new Error('QA metadata save failure');return realCatalogWrite(root,name,value);};});
+  const jsonReload=document.createElement('button');jsonReload.id='qaReloadJson';jsonReload.textContent='Reload JSON without browser review';panel.insertBefore(jsonReload,report);
   jsonReload.onclick=wrap(async()=>{await guard();clearTimeout(draftTimer);await draftSaveChain;await realSave(null);libraryCatalog=null;catalogDiskText=null;await loadLibraryCatalog();});
-  const corrupt=document.createElement('button');corrupt.id='qaCorruptCatalog';corrupt.textContent='메타데이터 손상 주입';panel.insertBefore(corrupt,report);
+  const corrupt=document.createElement('button');corrupt.id='qaCorruptCatalog';corrupt.textContent='Inject corrupt metadata';panel.insertBefore(corrupt,report);
   corrupt.onclick=wrap(async()=>{await guard();catalogOriginalForQA=await readCatalogText(libraryDirectoryHandle);await realCatalogWrite(libraryDirectoryHandle,CATALOG_FILE_NAME,'{"version":99}');});
   document.getElementById('qaLegacy').onclick = wrap(async()=>{
     await seed(400);
@@ -181,14 +181,14 @@
     const files = serializeBatchFiles().map(file=>({...file,patternFileName:`saved-${file.name}`,patternManuallyEdited:true,specialFolderKey:'scarves'}));
     await realSave({version:1,downloadDirectory:downloadDirectoryHandle,libraryDirectory:libraryDirectoryHandle,files});
     savedDraftRevision = draftRevision;
-    lastError = '구버전 복구본 준비 완료. 새로고침 후 이어서 검토를 누르세요.';
+    lastError = 'Legacy review ready. Refresh the page and select Resume review.';
   });
   document.getElementById('qaBreakSave').onclick = wrap(async()=>{
-    await guard(); ReviewDraftStore.save = async()=>{throw new Error('QA 저장 실패');};
+    await guard(); ReviewDraftStore.save = async()=>{throw new Error('QA save failure');};
   });
   document.getElementById('qaBreakMove').onclick = wrap(async()=>{
     await guard(); copyFileThenRemoveOriginal = async plan=>{
-      if(plan.sourceName.includes('003'))throw new Error('QA 이동 중단');
+      if(plan.sourceName.includes('003'))throw new Error('QA move interrupted');
       return realMove(plan);
     };
   });
@@ -204,7 +204,7 @@
     const root=await origin.getDirectoryHandle(name,{create:true});fixtureRoots.push(name);
     localStorage.setItem('pdfOrganizerQaRoots',JSON.stringify(fixtureRoots));
     window.showDirectoryPicker=async()=>root;
-    reloadDownloadData=async()=>{throw new Error('QA 폴더 읽기 실패');};
+    reloadDownloadData=async()=>{throw new Error('QA folder read failure');};
     document.getElementById('selectDownloadFolderButton').click();
     try {
       await new Promise(resolve=>setTimeout(resolve,0));
@@ -228,7 +228,7 @@
     draftRevision=0;savedDraftRevision=0;pendingDraft=null;
     libraryCatalog=null;catalogRoot=null;catalogDiskText=null;catalogError='';indexedLibraryFiles=[];categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryPageDrafts.clear();renderCatalogUI();
     renderSortingRows();renderDownloadFileList();renderAliasList();renderActionLogs();
-    draftSaveStatus.textContent='폴더를 선택하면 검토 내용을 자동 저장합니다.';
+    draftSaveStatus.textContent='Select a folder to enable review autosave.';
   });
   async function updateReport() {
     if(downloadDirectoryHandle&&!fixtureDownloads)await recoverFixtureHandle();

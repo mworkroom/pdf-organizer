@@ -31,16 +31,16 @@ test('v1 recovery keeps all 400 edits and caps current batch at 100', () => {
 test('malformed v2 drafts cannot silently grow the active batch or lose duplicate filenames', () => {
   const state=load();
   assert.throws(()=>state.normalizeReviewDraft({version:2,files:files(101).map(file=>({...file,role:'current'}))}),/100/);
-  assert.throws(()=>state.normalizeReviewDraft({version:2,files:[{name:'a.pdf',role:'current'},{name:'a.pdf',role:'queued'}]}),/복구본/);
-  assert.throws(()=>state.normalizeReviewDraft({version:2,files:[{name:'a.pdf',role:'missing'}]}),/묶음/);
+  assert.throws(()=>state.normalizeReviewDraft({version:2,files:[{name:'a.pdf',role:'current'},{name:'a.pdf',role:'queued'}]}),/saved review/);
+  assert.throws(()=>state.normalizeReviewDraft({version:2,files:[{name:'a.pdf',role:'missing'}]}),/batch/);
 });
 
 test('restore preserves frozen membership; new files join waiting queue', () => {
   const state=load();
-  state.restoreBatchMembership(files(5),{version:2,files:[{name:'file-2.pdf',role:'current'},{name:'file-0.pdf',role:'queued'},{name:'file-1.pdf',role:'deferred',deferredReason:'보류'}],selectedReviewName:'file-2.pdf',selections:['file-2.pdf','missing.pdf'],batchNumber:3});
+  state.restoreBatchMembership(files(5),{version:2,files:[{name:'file-2.pdf',role:'current'},{name:'file-0.pdf',role:'queued'},{name:'file-1.pdf',role:'deferred',deferredReason:'On hold'}],selectedReviewName:'file-2.pdf',selections:['file-2.pdf','missing.pdf'],batchNumber:3});
   assert.deepEqual(Array.from(state.downloadFiles,file=>file.name),['file-2.pdf']);
   assert.deepEqual(Array.from(state.queuedDownloadFiles,file=>file.name),['file-0.pdf','file-3.pdf','file-4.pdf']);
-  assert.equal(state.deferredDownloadFiles[0].deferredReason,'보류');
+  assert.equal(state.deferredDownloadFiles[0].deferredReason,'On hold');
   assert.equal(state.reviewSelections.size,1);
 });
 

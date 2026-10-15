@@ -19,24 +19,24 @@ async function writeCatalogText(root,name,text){
   catch(error){try{await writable.abort();}catch{}throw error;}
 }
 async function persistCatalog(next){
-  if(!libraryCatalog||catalogError||!catalogRoot||!await catalogRoot.isSameEntry(libraryDirectoryHandle))throw new Error(catalogError||'패턴 폴더의 메타데이터를 먼저 연결하세요.');
+  if(!libraryCatalog||catalogError||!catalogRoot||!await catalogRoot.isSameEntry(libraryDirectoryHandle))throw new Error(catalogError||'Load the pattern folder metadata first.');
   CatalogModel.validate(next);
   // Compare the exact disk snapshot, so another app/tab cannot silently lose changes.
   const current=await readCatalogText(catalogRoot);
-  if(current!==catalogDiskText)throw new Error('다른 곳에서 메타데이터가 변경되었습니다. 패턴 목록 새로고침 후 다시 시도하세요.');
+  if(current!==catalogDiskText)throw new Error('Metadata changed elsewhere. Refresh the library and try again.');
   next.revision=libraryCatalog.revision+1;next.updatedAt=new Date().toISOString();
   const text=JSON.stringify(next,null,2)+'\n';
   if(current!==null)await writeCatalogText(catalogRoot,CATALOG_BACKUP_NAME,current);
   await writeCatalogText(catalogRoot,CATALOG_FILE_NAME,text);
   libraryCatalog=next;catalogDiskText=text;
-  setCatalogStatus(`메타데이터 저장됨 · PDF ${next.patterns.filter(p=>p.present).length}개 · 카테고리 ${next.categories.length}개`);
+  setCatalogStatus(`Metadata saved · PDFs: ${next.patterns.filter(p=>p.present).length} · Categories: ${next.categories.length}`);
 }
 async function loadLibraryCatalog(){
   const root=libraryDirectoryHandle;
-  if(categoryEditorDirty||libraryCategoryDrafts.size||libraryPageDrafts.size)throw new Error('편집 중인 분류·대표 페이지를 먼저 저장하거나 취소한 뒤 목록을 새로 연결하세요.');
+  if(categoryEditorDirty||libraryCategoryDrafts.size||libraryPageDrafts.size)throw new Error('Save or cancel category and cover page edits before reconnecting the library.');
   if(typeof resetMaintenance==='function')resetMaintenance();
   libraryCatalog=null;indexedLibraryFiles=[];catalogRoot=root;catalogError='';
-  setCatalogStatus('패턴 목록과 메타데이터를 확인하는 중...');
+  setCatalogStatus('Checking the pattern library and metadata...');
   try{
     catalogDiskText=await readCatalogText(root);
     libraryCatalog=catalogDiskText===null?CatalogModel.create():CatalogModel.validate(JSON.parse(catalogDiskText));
@@ -56,10 +56,10 @@ async function loadLibraryCatalog(){
     const next=CatalogModel.reconcile(libraryCatalog,files);
     if(catalogDiskText===null||JSON.stringify(next)!==JSON.stringify(libraryCatalog))await persistCatalog(next);
     indexedLibraryFiles=files;
-    setCatalogStatus(`메타데이터 저장됨 · PDF ${files.length}개 · 카테고리 ${libraryCatalog.categories.length}개`);
+    setCatalogStatus(`Metadata saved · PDFs: ${files.length} · Categories: ${libraryCatalog.categories.length}`);
   }catch(error){
     libraryCatalog=null;catalogError=error.message;
-    setCatalogStatus(`메타데이터 연결 실패: ${error.message} · 원본 JSON과 백업 파일을 확인하세요.`);
+    setCatalogStatus(`Could not load metadata: ${error.message}. Check the original JSON and backup files.`);
   }
   libraryPage=0;renderCatalogUI();
 }
@@ -70,7 +70,7 @@ function inferReviewCategories(file){
     file.categoryIds=CatalogModel.infer(file.patternFileName||file.name,availableCategories());file.categorySource='filename';
   }
 }
-function categoryPicker(ids,onChange,label='카테고리'){
+function categoryPicker(ids,onChange,label='Category'){
   const field=document.createElement('fieldset');field.className='category-picker';
   const legend=document.createElement('legend');legend.textContent=label;field.append(legend);
   let selected=CatalogModel.categoryIds(ids,availableCategories());
@@ -89,20 +89,20 @@ function categoryPicker(ids,onChange,label='카테고리'){
 function renderReviewCategories(file){
   inferReviewCategories(file);
   const section=document.createElement('div');section.className='review-categories';
-  section.append(categoryPicker(file.categoryIds,ids=>{file.categoryIds=ids;file.categorySource='manual';scheduleDraftSave();section.querySelector('.note').textContent='수동 분류 · 재분석해도 유지됩니다.';},'카테고리 · 여러 개 선택 가능'));
-  const hint=document.createElement('p');hint.className='note';hint.textContent=file.categorySource==='manual'?'수동 분류 · 재분석해도 유지됩니다.':'파일명 기준 자동 분류 · 불분명하면 Unknown';
-  const reanalyze=document.createElement('button');reanalyze.type='button';reanalyze.className='secondary-button';reanalyze.textContent='파일명 다시 분석';
+  section.append(categoryPicker(file.categoryIds,ids=>{file.categoryIds=ids;file.categorySource='manual';scheduleDraftSave();section.querySelector('.note').textContent='Manual classification. Preserved during reanalysis.';},'Categories (select multiple)'));
+  const hint=document.createElement('p');hint.className='note';hint.textContent=file.categorySource==='manual'?'Manual classification. Preserved during reanalysis.':'Automatic filename classification. Unknown when uncertain.';
+  const reanalyze=document.createElement('button');reanalyze.type='button';reanalyze.className='secondary-button';reanalyze.textContent='Reanalyze filename';
   reanalyze.addEventListener('click',()=>{
-    if(file.categorySource==='manual'){hint.textContent='수동 분류를 유지했습니다.';return;}
+    if(file.categorySource==='manual'){hint.textContent='Manual classification preserved.';return;}
     inferReviewCategories(file);renderSelectedFile();scheduleDraftSave();
   });
   section.append(hint,reanalyze);return section;
 }
 async function catalogAction(action){
   if(operationBusy||draftLockedElsewhere)return;
-  setOperationBusy(true);setCatalogStatus('메타데이터 저장 중...');
+  setOperationBusy(true);setCatalogStatus('Saving metadata...');
   try{await action();scheduleDraftSave();await saveReviewDraft();}
-  catch(error){setCatalogStatus(`메타데이터 작업 실패: ${error.message}`);}
+  catch(error){setCatalogStatus(`Metadata operation failed: ${error.message}`);}
   finally{setOperationBusy(false);renderCatalogUI();renderSortingRows();}
 }
 function renderCatalogControls(){
@@ -117,7 +117,7 @@ function renderCatalogUI(){
   renderCategoryManager();renderLibraryPatterns();
   if(typeof renderMaintenance==='function')renderMaintenance();
   const bulk=document.getElementById('bulkCategoryPicker');bulk.replaceChildren();
-  let chosen=['unknown'];bulk.append(categoryPicker(chosen,ids=>chosen=ids,'선택 파일에 적용할 카테고리'));
+  let chosen=['unknown'];bulk.append(categoryPicker(chosen,ids=>chosen=ids,'Categories for selected files'));
   document.getElementById('applyBulkCategoriesButton').onclick=()=>{
     for(const file of downloadFiles.filter(file=>reviewSelections.has(file.name))){file.categoryIds=[...chosen];file.categorySource='manual';}
     renderSortingRows();scheduleDraftSave();
@@ -131,28 +131,28 @@ function categoryManagerDraft(){
 function renderCategoryManager(){
   if(categoryEditorDirty)return;
   const list=document.getElementById('categoryManagerList');list.replaceChildren();
-  if(!libraryCatalog){list.innerHTML='<p class="empty">패턴 폴더를 연결하면 카테고리를 관리할 수 있습니다.</p>';return;}
+  if(!libraryCatalog){list.innerHTML='<p class="empty">Connect a pattern folder to manage categories.</p>';return;}
   for(const [index,category] of libraryCatalog.categories.entries()){
     const row=document.createElement('div');row.className='category-editor';row.dataset.id=category.id;
-    const name=document.createElement('input');name.className='text-input category-name';name.value=category.name;name.setAttribute('aria-label',`${category.name} 이름`);
-    const keywords=document.createElement('input');keywords.className='text-input category-keywords';keywords.value=category.keywords.join(', ');keywords.setAttribute('aria-label',`${category.name} 추론 키워드`);keywords.placeholder='추론 키워드 · 쉼표로 구분';
-    name.oninput=keywords.oninput=()=>{categoryEditorDirty=true;setCatalogStatus('카테고리 편집 중 · 변경 저장을 눌러주세요.');};
+    const name=document.createElement('input');name.className='text-input category-name';name.value=category.name;name.setAttribute('aria-label',`${category.name} Name`);
+    const keywords=document.createElement('input');keywords.className='text-input category-keywords';keywords.value=category.keywords.join(', ');keywords.setAttribute('aria-label',`${category.name} Inference keywords`);keywords.placeholder='Keywords, separated by commas';
+    name.oninput=keywords.oninput=()=>{categoryEditorDirty=true;setCatalogStatus('Editing categories. Select Save category changes when ready.');};
     // Other/Unknown are semantic fallbacks: editable labels, no inference keywords.
     keywords.readOnly=['other','unknown'].includes(category.id);
     const tools=document.createElement('div');tools.className='category-row-tools';
-    for(const [label,offset] of [['위로',-1],['아래로',1]]){
+    for(const [label,offset] of [['Move up',-1],['Move down',1]]){
       const button=document.createElement('button');button.type='button';button.className='secondary-button';button.textContent=label;button.setAttribute('aria-label',`${category.name} ${label}`);
       button.disabled=index+offset<0||index+offset>=libraryCatalog.categories.length;
       button.onclick=()=>{const rows=[...list.children];const target=rows[index+offset];if(target){if(offset<0)target.before(row);else target.after(row);categoryEditorDirty=true;refreshCategoryOrderButtons();}};
       tools.append(button);
     }
-    const replacement=document.createElement('select');replacement.className='text-input';replacement.setAttribute('aria-label',`${category.name} 삭제 시 대체 카테고리`);
+    const replacement=document.createElement('select');replacement.className='text-input';replacement.setAttribute('aria-label',`${category.name} Replacement category on deletion`);
     for(const other of libraryCatalog.categories.filter(c=>c.id!==category.id)){const option=document.createElement('option');option.value=other.id;option.textContent=other.name;replacement.append(option);}replacement.value='unknown';
-    const remove=document.createElement('button');remove.type='button';remove.className='secondary-button';remove.textContent='삭제';remove.setAttribute('aria-label',`${category.name} 삭제`);remove.disabled=['other','unknown'].includes(category.id);
+    const remove=document.createElement('button');remove.type='button';remove.className='secondary-button';remove.textContent='Delete';remove.setAttribute('aria-label',`${category.name} Delete`);remove.disabled=['other','unknown'].includes(category.id);
     remove.onclick=()=>{
       if(operationBusy)return;
       const replacementId=replacement.value;
-      if(!window.confirm(`${category.name}을 삭제하고 사용 중인 분류를 ${replacement.selectedOptions[0].textContent}(으)로 바꿀까요? 다른 편집 내용도 함께 저장됩니다.`))return;
+      if(!window.confirm(`Delete ${category.name} and replace its assignments with ${replacement.selectedOptions[0].textContent}? Other pending category edits will also be saved.`))return;
       catalogAction(async()=>{
         const next=structuredClone(libraryCatalog);next.categories=categoryManagerDraft();CatalogModel.validate(next);
         CatalogModel.removeCategory(next,category.id,replacementId);await persistCatalog(next);
@@ -174,18 +174,18 @@ function refreshCategoryOrderButtons(){
 }
 function renderLibraryPatterns(){ renderGallery(); }
 async function persistMovedPattern(plan,copiedFile,sha256){
-  if(!libraryCatalog||catalogError)throw new Error(catalogError||'메타데이터를 사용할 수 없습니다.');
+  if(!libraryCatalog||catalogError)throw new Error(catalogError||'Metadata is unavailable.');
   const next=structuredClone(libraryCatalog);
   const isIncoming=await plan.sourceDirectory.isSameEntry(downloadDirectoryHandle);
   let pattern=isIncoming?null:next.patterns.find(p=>p.present&&p.path===plan.sourcePath);
-  if(!isIncoming&&!pattern)throw new Error(`이동할 도안의 메타데이터를 찾지 못했습니다: ${plan.sourcePath}`);
+  if(!isIncoming&&!pattern)throw new Error(`Could not find metadata for the pattern to move: ${plan.sourcePath}`);
   if(!pattern){
     const review=downloadFiles.find(file=>file.name===plan.sourceName);inferReviewCategories(review);
     pattern={id:review.patternId||crypto.randomUUID(),categoryIds:[...review.categoryIds],categorySource:review.categorySource,representativePage:1};next.patterns.push(pattern);
   }
   if(!isIncoming){
     const source=await (await plan.sourceDirectory.getFileHandle(plan.sourceName)).getFile();
-    if(source.size!==pattern.size||source.lastModified!==pattern.lastModified)throw new Error('라이브러리 파일이 변경되었습니다. 패턴 목록을 새로고침하세요.');
+    if(source.size!==pattern.size||source.lastModified!==pattern.lastModified)throw new Error('The library file has changed. Refresh the library.');
   }
   Object.assign(pattern,{path:`${plan.targetFolderName}/${plan.targetName}`,size:copiedFile.size,lastModified:copiedFile.lastModified,present:true});
   if(plan.targetFolderName!=='!zz_Singles')pattern.designerName=plan.targetFolderName;
@@ -194,19 +194,19 @@ async function persistMovedPattern(plan,copiedFile,sha256){
   await persistCatalog(next);
 }
 function initializeCatalogControls(){
-  const cancel=document.createElement('button');cancel.id='cancelCategoryEditsButton';cancel.type='button';cancel.className='secondary-button';cancel.dataset.catalogControl='';cancel.textContent='카테고리 편집 취소';
+  const cancel=document.createElement('button');cancel.id='cancelCategoryEditsButton';cancel.type='button';cancel.className='secondary-button';cancel.dataset.catalogControl='';cancel.textContent='Cancel category edits';
   document.getElementById('saveCategoriesButton').after(cancel);
-  cancel.onclick=()=>{categoryEditorDirty=false;document.getElementById('newCategoryName').value='';renderCategoryManager();renderCatalogControls();setCatalogStatus('카테고리 편집을 취소했습니다. 저장된 분류를 유지합니다.');};
+  cancel.onclick=()=>{categoryEditorDirty=false;document.getElementById('newCategoryName').value='';renderCategoryManager();renderCatalogControls();setCatalogStatus('Category edits canceled. Saved classifications are preserved.');};
   document.getElementById('refreshLibraryButton').onclick=()=>catalogAction(async()=>{await loadLibraryCatalog();});
   document.getElementById('saveCategoriesButton').onclick=()=>catalogAction(async()=>{const next=structuredClone(libraryCatalog);next.categories=categoryManagerDraft();await persistCatalog(next);categoryEditorDirty=false;});
   document.getElementById('addCategoryButton').onclick=()=>catalogAction(async()=>{
-    const input=document.getElementById('newCategoryName'),name=input.value.trim();if(!name)throw new Error('새 카테고리 이름을 입력하세요.');
+    const input=document.getElementById('newCategoryName'),name=input.value.trim();if(!name)throw new Error('Enter a new category name.');
     const next=structuredClone(libraryCatalog);next.categories=categoryManagerDraft();next.categories.push({id:crypto.randomUUID(),name,keywords:[]});await persistCatalog(next);categoryEditorDirty=false;input.value='';
   });
   document.getElementById('libraryPreviousButton').onclick=()=>{libraryPage--;renderLibraryPatterns();};
   document.getElementById('libraryNextButton').onclick=()=>{libraryPage++;renderLibraryPatterns();};
   document.getElementById('reanalyzeLibraryButton').onclick=()=>catalogAction(async()=>{
-    if(categoryEditorDirty)throw new Error('카테고리 키워드 편집 내용을 먼저 저장하세요.');
+    if(categoryEditorDirty)throw new Error('Save category keyword edits first.');
     const next=structuredClone(libraryCatalog);
     for(const pattern of next.patterns.filter(p=>p.present&&p.categorySource!=='manual')){pattern.categoryIds=CatalogModel.infer(pattern.path.split('/').at(-1),next.categories);pattern.categorySource='filename';delete pattern.analysis;}
     await persistCatalog(next);

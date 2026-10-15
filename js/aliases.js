@@ -26,7 +26,7 @@ async function persistDesignerAliasesToLibrary() {
     await writable.write(JSON.stringify(designerAliases, null, 2));
     await writable.close();
   } catch (error) {
-    console.warn("디자이너 연결 백업 파일 저장 실패", error);
+    console.warn("Could not save designer alias backup", error);
   }
 }
 
@@ -45,7 +45,7 @@ async function loadDesignerAliasesFromLibrary() {
     renderAliasList();
   } catch (error) {
     if (error.name !== "NotFoundError") {
-      console.warn("디자이너 연결 백업 파일 불러오기 실패", error);
+      console.warn("Could not load designer alias backup", error);
     }
   }
 }
@@ -71,11 +71,11 @@ function renderAliasList() {
   const aliases = Object.keys(designerAliases)
     .sort((a, b) => a.localeCompare(b, "ko"));
 
-  aliasCount.textContent = `(${aliases.length}개)`;
+  aliasCount.textContent = `(${aliases.length})`;
 
   if (aliases.length === 0) {
     aliasList.innerHTML =
-      `<p class="empty">아직 기억된 연결이 없습니다.</p>`;
+      `<p class="empty">No saved aliases yet.</p>`;
     return;
   }
 
@@ -93,7 +93,7 @@ function renderAliasList() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "delete-button";
-    button.textContent = "삭제";
+    button.textContent = "Delete";
 
     button.addEventListener("click", () => {
       delete designerAliases[alias];
@@ -111,12 +111,12 @@ function rememberConnection(file) {
   const folderName = getExistingFolderName(file);
 
   if (!folderName) {
-    alert("먼저 기존 디자이너를 선택하세요.");
+    alert("Select an existing designer first.");
     return;
   }
 
   if (!alias) {
-    alert("파일명 속 디자이너 표기를 입력하세요.");
+    alert("Enter the designer name as it appears in the filename.");
     return;
   }
 
@@ -133,9 +133,9 @@ function rememberConnection(file) {
     normalizeText(previousFolder) !== normalizeText(folderName)
   ) {
     const replaceConfirmed = window.confirm(
-      `이미 다른 연결이 저장되어 있습니다.\n\n` +
+      `A different alias mapping already exists.\n\n` +
       `${alias} → ${previousFolder}\n\n` +
-      `${alias} → ${folderName} 으로 바꿀까요?`
+      `Change it to ${alias} → ${folderName}?`
     );
 
     if (!replaceConfirmed) {

@@ -33,12 +33,12 @@ test('used category deletion reassigns and preserves other classifications',()=>
   const {context,run}=load();context.pattern=record('a.pdf',['sweater','hat']);
   run("var catalog=CatalogModel.create();catalog.patterns=[pattern];CatalogModel.removeCategory(catalog,'sweater','unknown');CatalogModel.validate(catalog);");
   assert.equal(run('JSON.stringify(catalog.patterns[0].categoryIds)'), '["hat"]');
-  assert.throws(()=>run("CatalogModel.removeCategory(catalog,'unknown','hat')"),/삭제/);
+  assert.throws(()=>run("CatalogModel.removeCategory(catalog,'unknown','hat')"),/cannot be deleted/);
 });
 test('invalid versions, category references, duplicate live paths and traversal are rejected',()=>{
   for(const mutation of ["catalog.version=2","catalog.categories[1].name='Sweater'","catalog.patterns[0].categoryIds=['missing']","catalog.patterns[0].path='../a.pdf'","catalog.patterns.push({...catalog.patterns[0],id:'another'})"]){
     const {context,run}=load();context.pattern=record();run('var catalog=CatalogModel.create();catalog.patterns=[pattern];');
-    run(mutation);assert.throws(()=>run('CatalogModel.validate(catalog)'),/형식/);
+    run(mutation);assert.throws(()=>run('CatalogModel.validate(catalog)'),/metadata format/);
   }
 });
 
@@ -88,7 +88,7 @@ test('disk conflict prevents overwrite; backup contains previous valid revision'
   const original=root.files.get('!pdf-organizer-library.json').data;
   await run('persistCatalog(structuredClone(libraryCatalog))');assert.equal(root.files.get('!pdf-organizer-library.backup.json').data,original);
   root.files.get('!pdf-organizer-library.json').data='external edit';
-  await assert.rejects(run('persistCatalog(structuredClone(libraryCatalog))'),/변경/);assert.equal(root.files.get('!pdf-organizer-library.json').data,'external edit');
+  await assert.rejects(run('persistCatalog(structuredClone(libraryCatalog))'),/changed/);assert.equal(root.files.get('!pdf-organizer-library.json').data,'external edit');
 });
 
 test('unsupported JSON stays untouched and blocks metadata access',async()=>{
@@ -96,15 +96,15 @@ test('unsupported JSON stays untouched and blocks metadata access',async()=>{
   context.renderCatalogUI=()=>{};
   await run('loadLibraryCatalog()');
   assert.equal(root.files.get('!pdf-organizer-library.json').data,'{"version":99}');
-  assert.equal(run('libraryCatalog'),null);assert.match(run('catalogError'),/덮어쓰지/);
+  assert.equal(run('libraryCatalog'),null);assert.match(run('catalogError'),/will not be overwritten/);
 });
 
 test('download/library overlap is refused in both directions',async()=>{
   const {context,run}=load();vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/storage.js'),'utf8'),context);
   context.a={isSameEntry:async other=>context.a===other,resolve:async other=>other===context.b?['nested']:[]};
   context.b={isSameEntry:async other=>context.b===other,resolve:async()=>null};
-  await assert.rejects(run('assertSeparateFolders(a,a)'),/다른 위치/);
-  await assert.rejects(run('assertSeparateFolders(a,b)'),/다른 위치/);
-  await assert.rejects(run('assertSeparateFolders(b,a)'),/다른 위치/);
+  await assert.rejects(run('assertSeparateFolders(a,a)'),/separate locations/);
+  await assert.rejects(run('assertSeparateFolders(a,b)'),/separate locations/);
+  await assert.rejects(run('assertSeparateFolders(b,a)'),/separate locations/);
   context.c={isSameEntry:async()=>false,resolve:async()=>null};await run('assertSeparateFolders(b,c)');
 });

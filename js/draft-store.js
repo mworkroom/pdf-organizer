@@ -15,7 +15,7 @@ window.ReviewDraftStore = (() => {
           resolve(request.result);
         };
         request.onerror = () => { database = null; reject(request.error); };
-        request.onblocked = () => { database = null; reject(new Error("다른 창에서 저장소를 사용 중입니다.")); };
+        request.onblocked = () => { database = null; reject(new Error("Storage is in use in another window.")); };
       });
     }
     return database;
@@ -27,7 +27,7 @@ window.ReviewDraftStore = (() => {
       const transaction = db.transaction("drafts", mode);
       const request = action(transaction.objectStore("drafts"));
       transaction.oncomplete = () => resolve(request.result);
-      transaction.onabort = () => reject(transaction.error || new Error("검토 내용 저장이 중단되었습니다."));
+      transaction.onabort = () => reject(transaction.error || new Error("Saving the review was interrupted."));
       transaction.onerror = () => reject(transaction.error);
     });
   }
