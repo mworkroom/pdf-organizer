@@ -125,107 +125,23 @@ function initializeBatchControls() {
   document.getElementById("nextBatchButton").addEventListener("click", () => startNextBatch());
   document.getElementById("deferBatchButton").addEventListener("click", deferCurrentBatch);
   document.getElementById("reviewDeferredButton").addEventListener("click", () => startNextBatch(true));
-  document.getElementById("selectAllReviewFiles").addEventListener("change", event => {
-    reviewSelections = event.target.checked ? new Set(downloadFiles.map(file => file.name)) : new Set();
-    renderReviewFileList(); scheduleDraftSave();
-  });
-  document.getElementById("applyBulkDesignerButton").addEventListener("click", () => {
-    const designer = document.getElementById("bulkDesignerInput").value.trim();
-    if (!designer || !reviewSelections.size || operationBusy) return;
-    const folder = designerFolders.find(name => normalizeText(name) === normalizeText(designer));
-    for (const file of downloadFiles.filter(file => reviewSelections.has(file.name) && !file.excluded)) {
-      file.destinationName = folder || designer;
-      file.selectedFolder = folder || null;
-      file.autoLinkedAlias = "";
-      if (!file.sourceDesignerTouched) {
-        const alias = findMatchingRememberedAlias(file.name);
-        file.sourceDesignerName = alias && alias.folderName === folder ? alias.alias : designer;
-      }
-      if (!file.patternManuallyEdited) file.patternFileName = suggestPatternFileName(file.name, file.sourceDesignerName);
-    }
-    invalidateDuplicateCheck(); renderSortingRows();
-  });
-  for (const [id, excluded] of [["excludeSelectedButton", true], ["includeSelectedButton", false]]) {
-    document.getElementById(id).addEventListener("click", () => {
-      if (operationBusy) return;
-      for (const file of downloadFiles.filter(file => reviewSelections.has(file.name))) file.excluded = excluded;
-      invalidateDuplicateCheck(); renderSortingRows();
-    });
-  }
 }
 
 function selectReviewFile(name) {
   if (!downloadFiles.some(file => file.name === name)) return;
   selectedReviewName = name;
-  renderSortingRows();
-  document.querySelector('.review-file-button[aria-current="true"]')?.focus({ preventScroll: true });
   scheduleDraftSave();
-}
-
-function reviewStatus(file) {
-  if (file.excluded) return "Excluded";
-  if (!file.destinationName.trim() || !ensurePdfExtension(file.patternFileName.trim())) return "Details needed";
-  return { move: "Ready to move", hold: "On hold", deleteDuplicate: "Delete duplicate" }[file.analysis.action] || "Not checked";
-}
-
-function renderReviewFileList() {
-  const list = document.getElementById("reviewFileList");
-  const previousScroll = list.scrollTop;
-  list.replaceChildren();
-  if (!downloadFiles.length) list.innerHTML = '<p class="empty">Batch complete. Open the next batch or review deferred files.</p>';
-  for (const file of downloadFiles) {
-    const row = document.createElement("div");
-    row.className = "review-list-row" + (file.name === selectedReviewName ? " selected" : "");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox"; checkbox.checked = reviewSelections.has(file.name);
-    checkbox.setAttribute("aria-label", `Select ${file.name} for bulk actions`);
-    checkbox.addEventListener("change", () => {
-      if (checkbox.checked) reviewSelections.add(file.name); else reviewSelections.delete(file.name);
-      updateBatchControls(); scheduleDraftSave();
-    });
-    const button = document.createElement("button");
-    button.type = "button"; button.className = "review-file-button";
-    button.setAttribute("aria-current", String(file.name === selectedReviewName));
-    const name = document.createElement("span"); name.className = "review-file-name"; name.textContent = file.name;
-    const designer = document.createElement("span"); designer.className = "review-file-designer"; designer.textContent = file.destinationName || "No designer assigned";
-    const status = document.createElement("span"); status.className = "review-file-status"; status.textContent = reviewStatus(file);
-    file.listDesignerElement = designer; file.listStatusElement = status;
-    button.append(name, designer, status);
-    button.addEventListener("click", () => selectReviewFile(file.name));
-    button.addEventListener("keydown", event => {
-      if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
-      event.preventDefault();
-      const index = downloadFiles.indexOf(file) + (event.key === "ArrowDown" ? 1 : -1);
-      if (downloadFiles[index]) {
-        selectReviewFile(downloadFiles[index].name);
-        list.querySelectorAll(".review-file-button")[index]?.focus();
-      }
-    });
-    row.append(checkbox, button); list.append(row);
-  }
-  list.scrollTop = previousScroll;
-  updateBatchControls();
 }
 
 function updateBatchControls() {
   document.getElementById("batchTitle").textContent = `Batch ${batchNumber}`;
   document.getElementById("batchSummary").textContent = `Current: ${downloadFiles.length} · Queued: ${queuedDownloadFiles.length} · Deferred/excluded: ${deferredDownloadFiles.length}`;
-  const count = reviewSelections.size;
-  document.getElementById("reviewSelectionCount").textContent = `${count} selected`;
-  const all = document.getElementById("selectAllReviewFiles");
-  all.checked = Boolean(downloadFiles.length) && count === downloadFiles.length;
-  all.indeterminate = count > 0 && count < downloadFiles.length;
   if (!operationBusy) {
-    all.disabled = !downloadFiles.length;
     document.getElementById("nextBatchButton").disabled = Boolean(downloadFiles.length) || !queuedDownloadFiles.length;
     document.getElementById("deferBatchButton").disabled = !downloadFiles.length;
     document.getElementById("reviewDeferredButton").disabled = Boolean(downloadFiles.length) || !deferredDownloadFiles.length;
     duplicateCheckButton.disabled = !downloadFiles.length;
     executeButton.disabled = !downloadFiles.length;
-    document.getElementById("applyBulkDesignerButton").disabled = !count;
-    document.getElementById("excludeSelectedButton").disabled = !count;
-    document.getElementById("includeSelectedButton").disabled = !count;
-    document.getElementById("applyBulkCategoriesButton").disabled = !count;
   }
   const deferredPanel = document.getElementById("deferredPanel");
   deferredPanel.classList.toggle("hidden", !deferredDownloadFiles.length);

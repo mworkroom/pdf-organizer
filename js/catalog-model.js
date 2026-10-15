@@ -73,5 +73,18 @@ const CatalogModel = (() => {
       if(p.categoryIds.includes(id)){p.categoryIds=categoryIds(p.categoryIds.map(c=>c===id?replacement:c),catalog.categories);p.categorySource='manual';}
     }
   }
-  return {create,validate,infer,categoryIds,reconcile,removeCategory};
+  function replaceCategories(catalog, patternIds, replacementIds) {
+    const targets=new Set(patternIds);
+    const known=new Set(catalog.categories.map(category=>category.id));
+    if(!targets.size)throw new Error('Select patterns first.');
+    if(!replacementIds.length||replacementIds.some(id=>!known.has(id)))throw new Error('Choose valid replacement categories.');
+    const present=new Set(catalog.patterns.filter(pattern=>pattern.present).map(pattern=>pattern.id));
+    if([...targets].some(id=>!present.has(id)))throw new Error('Selected patterns have changed. Refresh the library and select them again.');
+    const next=structuredClone(catalog),ids=categoryIds(replacementIds,catalog.categories);
+    for(const pattern of next.patterns)if(targets.has(pattern.id)){
+      pattern.categoryIds=[...ids];pattern.categorySource='manual';
+    }
+    return validate(next);
+  }
+  return {create,validate,infer,categoryIds,reconcile,removeCategory,replaceCategories};
 })();

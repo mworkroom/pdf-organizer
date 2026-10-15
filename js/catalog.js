@@ -70,17 +70,20 @@ function inferReviewCategories(file){
     file.categoryIds=CatalogModel.infer(file.patternFileName||file.name,availableCategories());file.categorySource='filename';
   }
 }
-function categoryPicker(ids,onChange,label='Category'){
+function categoryPicker(ids,onChange,label='Category',allowEmpty=false){
   const field=document.createElement('fieldset');field.className='category-picker';
   const legend=document.createElement('legend');legend.textContent=label;field.append(legend);
-  let selected=CatalogModel.categoryIds(ids,availableCategories());
+  let selected=allowEmpty&&!ids.length?[]:CatalogModel.categoryIds(ids,availableCategories());
   for(const category of availableCategories()){
     const item=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span');
     input.type='checkbox';input.value=category.id;input.checked=selected.includes(category.id);input.disabled=draftLockedElsewhere;
     name.textContent=category.name;item.append(input,name);field.append(item);
     input.addEventListener('change',()=>{
       if(category.id==='unknown'&&input.checked)selected=['unknown'];
-      else selected=CatalogModel.categoryIds(input.checked?[...selected,category.id]:selected.filter(id=>id!==category.id),availableCategories());
+      else {
+        const next=input.checked?[...selected,category.id]:selected.filter(id=>id!==category.id);
+        selected=allowEmpty&&!next.length?[]:CatalogModel.categoryIds(next,availableCategories());
+      }
       field.querySelectorAll('input').forEach(box=>box.checked=selected.includes(box.value));onChange([...selected]);
     });
   }
@@ -94,9 +97,11 @@ function renderReviewCategories(file){
   const reanalyze=document.createElement('button');reanalyze.type='button';reanalyze.className='secondary-button';reanalyze.textContent='Reanalyze filename';
   reanalyze.addEventListener('click',()=>{
     if(file.categorySource==='manual'){hint.textContent='Manual classification preserved.';return;}
-    inferReviewCategories(file);renderSelectedFile();scheduleDraftSave();
+    inferReviewCategories(file);file.rowElement?.querySelector('.review-categories')?.replaceWith(renderReviewCategories(file));scheduleDraftSave();
   });
-  section.append(hint,reanalyze);return section;
+  section.append(hint,reanalyze);
+  if(file.excluded)section.querySelectorAll('input,button').forEach(control=>control.disabled=true);
+  return section;
 }
 async function catalogAction(action){
   if(operationBusy||draftLockedElsewhere)return;
@@ -109,19 +114,12 @@ function renderCatalogControls(){
   const disabled=operationBusy||draftLockedElsewhere||!libraryCatalog||Boolean(catalogError);
   document.querySelectorAll('[data-catalog-control]').forEach(control=>control.disabled=disabled);
   document.getElementById('refreshLibraryButton').disabled=operationBusy||draftLockedElsewhere||!libraryDirectoryHandle;
-  document.getElementById('applyBulkCategoriesButton').disabled=operationBusy||!reviewSelections.size;
   renderGalleryControls();
   if(typeof renderMaintenanceControls==='function')renderMaintenanceControls();
 }
 function renderCatalogUI(){
   renderCategoryManager();renderLibraryPatterns();
   if(typeof renderMaintenance==='function')renderMaintenance();
-  const bulk=document.getElementById('bulkCategoryPicker');bulk.replaceChildren();
-  let chosen=['unknown'];bulk.append(categoryPicker(chosen,ids=>chosen=ids,'Categories for selected files'));
-  document.getElementById('applyBulkCategoriesButton').onclick=()=>{
-    for(const file of downloadFiles.filter(file=>reviewSelections.has(file.name))){file.categoryIds=[...chosen];file.categorySource='manual';}
-    renderSortingRows();scheduleDraftSave();
-  };
   renderCatalogControls();
   if(operationBusy)setOperationBusy(true);
 }

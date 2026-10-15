@@ -98,25 +98,28 @@ function renderDesignerFolders(folders) {
 function renderSortingRows() {
   sortingPanel.classList.toggle("hidden", !getAllReviewFiles().length);
   if (!downloadFiles.some(file => file.name === selectedReviewName)) selectedReviewName = downloadFiles[0]?.name || "";
-  renderReviewFileList();
-  renderSelectedFile();
+  renderReviewCards();
+  updateBatchControls();
 }
-function renderSelectedFile() {
+function renderReviewCards() {
   sortingList.innerHTML = "";
 
   for (const file of downloadFiles) {
     for (const field of ["rowElement", "destinationInputElement", "patternInputElement", "previewElement", "statusElement"]) file[field] = null;
   }
-  const selected = downloadFiles.find(file => file.name === selectedReviewName);
-  if (!selected) {
-    sortingList.innerHTML = '<p class="empty">Select a file to review.</p>';
+  if (!downloadFiles.length) {
+    sortingList.innerHTML = '<p class="empty">Batch complete. Open the next batch or review deferred files.</p>';
     return;
   }
 
-  [selected].forEach((file) => {
+  downloadFiles.forEach((file) => {
     const row = document.createElement("div");
     row.className = file.excluded ? "sort-row excluded" : "sort-row";
     file.rowElement = row;
+    row.dataset.reviewName = file.name;
+    row.addEventListener('focusin', () => {
+      if (selectedReviewName !== file.name) { selectedReviewName = file.name; scheduleDraftSave(); }
+    });
 
     const sourceHeader = document.createElement("div");
     sourceHeader.className = "source-header";
@@ -160,6 +163,7 @@ function renderSelectedFile() {
     const destinationInput = document.createElement("input");
     destinationInput.className = "text-input";
     destinationInput.type = "text";
+    destinationInput.setAttribute('aria-label', `Destination designer for ${file.name}`);
     destinationInput.placeholder = "e.g. Knitree, Mayo, Namu Knitree";
     destinationInput.value = file.destinationName;
     destinationInput.disabled = file.excluded;
@@ -191,6 +195,7 @@ function renderSelectedFile() {
     const sourceDesignerInput = document.createElement("input");
     sourceDesignerInput.className = "text-input";
     sourceDesignerInput.type = "text";
+    sourceDesignerInput.setAttribute('aria-label', `Source designer for ${file.name}`);
     sourceDesignerInput.placeholder = "e.g. Knitree, Anna-Sofia Vintersol";
     sourceDesignerInput.value = file.sourceDesignerName;
     sourceDesignerInput.disabled = file.excluded;
@@ -222,6 +227,7 @@ function renderSelectedFile() {
     const patternInput = document.createElement("input");
     patternInput.className = "text-input";
     patternInput.type = "text";
+    patternInput.setAttribute('aria-label', `Pattern filename for ${file.name}`);
     patternInput.placeholder = "e.g. summer_top.pdf";
     patternInput.value = file.patternFileName;
     patternInput.disabled = file.excluded;
@@ -273,7 +279,11 @@ function renderSelectedFile() {
       file.excluded = excludeCheckbox.checked;
 
       invalidateDuplicateCheck();
-      renderSortingRows();
+      row.classList.toggle('excluded', file.excluded);
+      row.querySelectorAll('input, button').forEach(control => {
+        if (control !== excludeCheckbox && control !== openButton) control.disabled = file.excluded;
+      });
+      rememberButton.disabled = file.excluded || !getExistingFolderName(file);
     });
 
     rememberButton.addEventListener("click", () => {
@@ -458,8 +468,6 @@ function updateAllPreviews() {
   downloadFiles.forEach((file) => {
     updatePreview(file);
     updateRowStatus(file);
-    if (file.listDesignerElement) file.listDesignerElement.textContent = file.destinationName || "No designer assigned";
-    if (file.listStatusElement) file.listStatusElement.textContent = reviewStatus(file);
   });
   updateBatchControls();
 }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
 
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=20261016-roles">
 </head>
 
 <body>
@@ -77,15 +77,8 @@
         <button id="executeButton" class="execute-button">Organize batch</button>
         <div id="executeStatus" class="execute-status" role="status" aria-live="polite"></div>
       </div>
-      <div class="review-workspace">
-        <section class="review-list-pane" aria-label="Current batch files">
-          <div class="selection-toolbar"><label><input id="selectAllReviewFiles" type="checkbox"> Select all in batch</label><span id="reviewSelectionCount">0 selected</span></div>
-          <div class="bulk-tools"><input id="bulkDesignerInput" class="text-input" placeholder="Designer for selected files" aria-label="Designer to apply in bulk"><button id="applyBulkDesignerButton" class="secondary-button" type="button">Apply</button><button id="excludeSelectedButton" class="secondary-button" type="button">Exclude selected</button><button id="includeSelectedButton" class="secondary-button" type="button">Include selected</button></div>
-          <details class="bulk-category-tools"><summary>Apply categories to selected files</summary><div id="bulkCategoryPicker"></div><button id="applyBulkCategoriesButton" class="secondary-button" type="button" disabled>Replace selected categories</button><p class="note">Replaces existing categories for selected files and saves them as manual classifications.</p></details>
-          <div id="reviewFileList" class="review-file-list"></div>
-        </section>
-        <section class="review-detail-pane" aria-label="Selected file details"><div id="sortingList"></div></section>
-      </div>
+      <p class="note review-intro">Review each file below, then check duplicates and organize this batch. Changes are saved automatically.</p>
+      <section id="sortingList" class="review-cards" aria-label="Files to review"></section>
     </section>
 
     <section id="deferredPanel" class="panel hidden"><div class="panel-header"><div><h2>Deferred and excluded files <span id="deferredCount"></span></h2><p class="note">These files remain in the download folder and are not included in the next batch automatically.</p></div><button id="reviewDeferredButton" class="secondary-button" type="button">Review deferred files</button></div><div id="deferredFileList" class="list"></div></section>
@@ -112,6 +105,14 @@
       <div class="panel-header"><div><h2>Pattern Library</h2><p id="catalogStatus" class="note" role="status" aria-live="polite">Connect a pattern folder.</p></div><button id="refreshLibraryButton" class="secondary-button" type="button" disabled>Refresh library</button></div>
       <div class="gallery-search"><label for="librarySearch">Search patterns</label><input id="librarySearch" type="search" class="text-input" placeholder="Search filenames, designers, and categories" disabled></div>
       <div class="gallery-toolbar"><label>Category<select id="libraryCategoryFilter" class="text-input" disabled><option value="">All categories</option></select></label><label>Designer<select id="libraryDesignerFilter" class="text-input" disabled><option value="">All designers</option></select></label><label>Sort by<select id="librarySort" class="text-input" disabled><option value="name">File name</option><option value="designer">Designer</option><option value="recent">Last modified</option></select></label><button id="clearGalleryFiltersButton" class="secondary-button" type="button" disabled>Clear filters</button><div class="gallery-view-options" role="group" aria-label="Library view"><button id="galleryGridButton" class="secondary-button" type="button" aria-pressed="true" disabled>Gallery</button><button id="galleryListButton" class="secondary-button" type="button" aria-pressed="false" disabled>List</button></div></div>
+      <div class="library-selection-entry"><button id="librarySelectButton" class="secondary-button" type="button" aria-pressed="false" aria-controls="libraryBulkTools" disabled>Select patterns</button><p class="note">Filter by category and designer to classify existing patterns together.</p></div>
+      <section id="libraryBulkTools" class="library-bulk-tools hidden" aria-label="Bulk category editing">
+        <div class="library-selection-actions"><strong id="librarySelectionCount" role="status" aria-live="polite">0 selected</strong><button id="selectLibraryPageButton" class="secondary-button" type="button">Select this page</button><button id="selectLibraryResultsButton" class="secondary-button" type="button">Select all results</button><button id="clearLibrarySelectionButton" class="secondary-button" type="button">Clear selection</button></div>
+        <p class="note">Selection stays across pages. Changing search or filters clears it. Applying categories replaces the selected patterns’ existing categories.</p>
+        <div id="libraryBulkCategoryPicker"></div>
+        <button id="applyLibraryCategoriesButton" type="button" disabled>Apply categories</button>
+      </section>
+      <p id="libraryBulkStatus" class="note" role="status" aria-live="polite"></p>
       <div class="library-pagination"><button id="libraryPreviousButton" class="secondary-button" type="button" disabled>Previous</button><span id="libraryPageSummary" role="status" aria-live="polite"></span><button id="libraryNextButton" class="secondary-button" type="button" disabled>Next</button><button id="clearThumbnailCacheButton" class="secondary-button cache-clear" type="button" disabled>Clear thumbnail cache</button></div>
       <p id="previewStatus" class="note" role="status">Previews load for visible PDFs first.</p>
       <div id="libraryPatternList"></div>
@@ -120,23 +121,24 @@
     <section class="panel"><h2>Designer folders</h2><p class="note">Browse designers in the connected pattern folder.</p><input type="search" id="designerSearch" class="search-box" placeholder="Search designers" aria-label="Search designers" disabled><div id="designerFolderList" class="list"><p class="empty">Select a pattern folder first.</p></div></section>
   </main>
 
-  <script src="js/draft-store.js" defer></script>
-  <script src="js/utils.js" defer></script>
-  <script src="js/storage.js" defer></script>
-  <script src="js/aliases.js" defer></script>
-  <script src="js/logs.js" defer></script>
-  <script src="js/organizer.js" defer></script>
-  <script src="js/review.js" defer></script>
-  <script src="js/library.js" defer></script>
-  <script src="js/batch.js" defer></script>
-  <script src="js/catalog-model.js" defer></script>
-  <script src="js/gallery-model.js" defer></script>
-  <script src="js/thumbnail-store.js" defer></script>
-  <script src="js/pdf-preview.js" defer></script>
-  <script src="js/gallery.js" defer></script>
-  <script src="js/catalog.js" defer></script>
-  <script src="js/maintenance-model.js" defer></script>
-  <script src="js/maintenance.js" defer></script>
-  <script src="js/app.js" defer></script>
+  <script src="js/draft-store.js?v=20261016-roles" defer></script>
+  <script src="js/utils.js?v=20261016-roles" defer></script>
+  <script src="js/storage.js?v=20261016-roles" defer></script>
+  <script src="js/aliases.js?v=20261016-roles" defer></script>
+  <script src="js/logs.js?v=20261016-roles" defer></script>
+  <script src="js/organizer.js?v=20261016-roles" defer></script>
+  <script src="js/review.js?v=20261016-roles" defer></script>
+  <script src="js/library.js?v=20261016-roles" defer></script>
+  <script src="js/batch.js?v=20261016-roles" defer></script>
+  <script src="js/catalog-model.js?v=20261016-roles" defer></script>
+  <script src="js/gallery-model.js?v=20261016-roles" defer></script>
+  <script src="js/thumbnail-store.js?v=20261016-roles" defer></script>
+  <script src="js/pdf-preview.js?v=20261016-roles" defer></script>
+  <script src="js/gallery.js?v=20261016-roles" defer></script>
+  <script src="js/library-bulk.js?v=20261016-roles" defer></script>
+  <script src="js/catalog.js?v=20261016-roles" defer></script>
+  <script src="js/maintenance-model.js?v=20261016-roles" defer></script>
+  <script src="js/maintenance.js?v=20261016-roles" defer></script>
+  <script src="js/app.js?v=20261016-roles" defer></script>
 </body>
 </html>

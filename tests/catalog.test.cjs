@@ -19,6 +19,31 @@ test('23 defaults and conservative English/Korean multiple category inference',(
     assert.deepEqual(JSON.parse(run(`JSON.stringify(CatalogModel.infer(${JSON.stringify(name)},CatalogModel.create().categories))`)),ids);
   }
 });
+
+test('bulk categories replace only selected present records and preserve identity, metadata and input',()=>{
+  const {context,run}=load();
+  context.records=[{...record(),sha256:'a'.repeat(64),representativePage:2,analysis:{version:1,status:'done',pages:3,matches:['sweater'],at:'2026-10-16'}},{...record('Bora/Other.pdf',['unknown'],'filename'),id:'other'},{...record('Missing.pdf',['hat']),id:'missing',present:false}];
+  run('var catalog=CatalogModel.create();catalog.patterns=records;var next=CatalogModel.replaceCategories(catalog,["pattern-1"],["unknown","socks","shawl"]);');
+  const original=JSON.parse(run('JSON.stringify(catalog.patterns[0])')),updated=JSON.parse(run('JSON.stringify(next.patterns[0])'));
+  assert.deepEqual(updated,{...original,categoryIds:['socks','shawl'],categorySource:'manual'});
+  assert.deepEqual(JSON.parse(run('JSON.stringify(next.patterns.slice(1))')),JSON.parse(run('JSON.stringify(catalog.patterns.slice(1))')));
+  assert.deepEqual(original.categoryIds,['sweater']);
+  run('var unknown=CatalogModel.replaceCategories(next,["pattern-1"],["unknown"]);');assert.deepEqual(JSON.parse(run('JSON.stringify(unknown.patterns[0].categoryIds)')),['unknown']);
+});
+
+test('bulk categories reject stale selections and invalid categories before changing anything',()=>{
+  const {context,run}=load();context.pattern=record();run('var catalog=CatalogModel.create();catalog.patterns=[pattern];');
+  for(const args of ['[],["socks"]','["gone"],["socks"]','["pattern-1"],[]','["pattern-1"],["deleted-category"]'])assert.throws(()=>run(`CatalogModel.replaceCategories(catalog,${args})`));
+  run('catalog.patterns[0].present=false;');assert.throws(()=>run('CatalogModel.replaceCategories(catalog,["pattern-1"],["socks"])'),/changed/);
+  assert.deepEqual(JSON.parse(run('JSON.stringify(catalog.patterns[0].categoryIds)')),['sweater']);
+});
+
+test('bulk classification covers thousands of filtered results independently of pagination and file batches',()=>{
+  const {context,run}=load();context.records=Array.from({length:3767},(_,i)=>({...record(`Designer/Pattern_${i}.pdf`,['unknown'],'filename'),id:`pattern-${i}`}));
+  run('var catalog=CatalogModel.create();catalog.patterns=records;var next=CatalogModel.replaceCategories(catalog,catalog.patterns.map(p=>p.id),["socks"]);');
+  assert.equal(run('next.patterns.filter(p=>p.categorySource==="manual"&&p.categoryIds.join() === "socks").length'),3767);
+  assert.equal(run('catalog.patterns.every(p=>p.categoryIds[0]==="unknown")'),true);
+});
 test('rename, keyword edits and rescans retain manual IDs; replacements retain orphan metadata',()=>{
   const {context,run}=load();context.pattern=record();
   run("var catalog=CatalogModel.create();catalog.patterns=[pattern];catalog.categories[0].name='Pullovers';catalog.categories[0].keywords=['newword'];var next=CatalogModel.reconcile(catalog,[{path:pattern.path,name:'Sweater.pdf',size:10,lastModified:1}]);");

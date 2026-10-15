@@ -16,15 +16,18 @@ async function main(){
     await page.goto((process.env.PDF_ORGANIZER_TEST_URL||'http://127.0.0.1:8766/')+'?qa=1');
     await ui('Prepare category samples').click();
     await waitReport(()=>{const r=JSON.parse(document.getElementById('qaReport').textContent);return r.current===100&&r.catalog?.patterns.length===3;});
-    await page.locator('#sortingList').getByRole('checkbox',{name:'Hat',exact:true}).check();
-    await page.locator('#sortingList').getByRole('checkbox',{name:'Scarf',exact:true}).check();
-    await ui('Reanalyze filename').click();
+    const incoming=()=>page.locator('#sortingList .sort-row').first();
+    assert.equal(await page.locator('#sortingList .sort-row').count(),100);
+    await incoming().getByRole('checkbox',{name:'Hat',exact:true}).check();
+    await incoming().getByRole('checkbox',{name:'Scarf',exact:true}).check();
+    await incoming().getByRole('button',{name:'Reanalyze filename',exact:true}).click();
     await waitReport(()=>JSON.parse(document.getElementById('qaReport').textContent).savedSelectedCategories?.join(',')==='hat,scarf');
     await page.reload();await ui('Resume review').click();
     await waitReport(()=>JSON.parse(document.getElementById('qaReport').textContent).current===100);
-    assert.equal(await page.locator('#sortingList').getByRole('checkbox',{name:'Hat',exact:true}).isChecked(),true);
+    assert.equal(await incoming().getByRole('checkbox',{name:'Hat',exact:true}).isChecked(),true);
     await ui('Pattern Library').click();
     await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill('Root_Sweater');
+    await page.waitForFunction(()=>document.querySelector('#libraryPatternList').dataset.query==='Root_Sweater');
     const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater.pdf'});
     await root().locator('summary').click();
     await root().getByRole('checkbox',{name:'Hat',exact:true}).check();await root().getByRole('checkbox',{name:'Scarf',exact:true}).check();
@@ -51,8 +54,10 @@ async function main(){
     if(process.env.PDF_ORGANIZER_ARTIFACT_DIR){await page.locator('#categoryManager > summary').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,'pdf-organizer-step3-categories-1280.png')});}
     await page.setViewportSize({width:2048,height:1152});
     await page.locator('#categoryManager > summary').click();
-    await ui('Organize Files').click();await page.getByRole('checkbox',{name:'Select Designer_Pattern_002.pdf for bulk actions',exact:true}).check();
-    await page.locator('.bulk-category-tools > summary').click();await page.locator('#bulkCategoryPicker').getByRole('checkbox',{name:'Hat',exact:true}).check();await page.locator('#bulkCategoryPicker').getByRole('checkbox',{name:'Shawl',exact:true}).check();await ui('Replace selected categories').click();
+    await ui('Organize Files').click();
+    const secondIncoming=page.locator('#sortingList .sort-row').filter({hasText:'Source file: Designer_Pattern_002.pdf'});
+    await secondIncoming.getByRole('checkbox',{name:'Unknown',exact:true}).check();
+    await secondIncoming.getByRole('checkbox',{name:'Hat',exact:true}).check();await secondIncoming.getByRole('checkbox',{name:'Shawl',exact:true}).check();
     await ui('Check duplicates').click();await waitReport(()=>JSON.parse(document.getElementById('qaReport').textContent).checked);
     await ui('Inject metadata save failure').click();await ui('Organize batch').click();
     await page.waitForFunction(()=>document.getElementById('executeStatus').textContent.includes('Run failed')&&!document.getElementById('duplicateCheckButton').disabled);
