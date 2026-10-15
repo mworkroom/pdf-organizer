@@ -28,8 +28,8 @@ async function main(){
     await ui('Pattern Library').click();
     await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill('Root_Sweater');
     await page.waitForFunction(()=>document.querySelector('#libraryPatternList').dataset.query==='Root_Sweater');
-    const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater.pdf'});
-    await root().locator('summary').click();
+    const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater'});
+    await root().getByRole('button',{name:'Edit',exact:true}).click();
     await root().getByRole('checkbox',{name:'Hat',exact:true}).check();await root().getByRole('checkbox',{name:'Scarf',exact:true}).check();
     await ui('Save categories').click();await idle();
     const rootId=(await report()).catalog.patterns.find(p=>p.path==='Root_Sweater.pdf').id;
@@ -44,7 +44,7 @@ async function main(){
     await page.getByRole('combobox',{name:'Scarf Replacement category on deletion',exact:true}).selectOption('shawl');
     page.once('dialog',dialog=>dialog.accept());await ui('Scarf Delete').click();await idle();assert.match(await root().innerText(),/Pullovers.*Hat.*Shawl/);
     // Unsaved library classifications and category names survive other JSON saves.
-    await root().locator('summary').click();await root().getByRole('checkbox',{name:'Cowl',exact:true}).check();
+    await root().getByRole('button',{name:'Edit',exact:true}).click();await root().getByRole('checkbox',{name:'Cowl',exact:true}).check();
     await page.getByRole('textbox',{name:'Pullovers Name',exact:true}).fill('Pullovers Edited');await ui('Save category changes').click();await idle();
     assert.equal(await root().getByRole('checkbox',{name:'Cowl',exact:true}).isChecked(),true);
     await root().getByRole('button',{name:'Cancel changes',exact:true}).click();
@@ -73,7 +73,7 @@ async function main(){
     await ui('Inject corrupt metadata').click();await ui('Refresh library').click();await idle();
     assert.match(await page.locator('#catalogStatus').innerText(),/original JSON will not be overwritten/);
     await ui('Clear injected errors').click();await idle();
-    await root().locator('summary').click();
+    await root().getByRole('button',{name:'Edit',exact:true}).click();
     for(const width of [2048,1280]){
       await page.setViewportSize({width,height:1152});await page.evaluate(()=>window.scrollTo(0,0));
       const layout=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth,inputSize:getComputedStyle(document.querySelector('.category-picker label')).fontSize,buttons:[...document.querySelectorAll('#libraryView button')].filter(b=>b.getBoundingClientRect().width&&b.getBoundingClientRect().top<innerHeight).map(b=>({left:b.getBoundingClientRect().left,right:b.getBoundingClientRect().right}))}));

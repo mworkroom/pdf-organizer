@@ -36,7 +36,7 @@ const MaintenanceModel=(()=>{
     const next=structuredClone(catalog),old=next.patterns.find(p=>p.id===missingId),candidate=next.patterns.find(p=>p.id===candidateId);
     if(!old||old.present||!candidate?.present||old.size!==candidate.size)throw new Error('The recovery target has changed. Refresh the library.');
     if(verified&&(!old.sha256||old.sha256!==sha256))throw new Error('The hash does not match the saved hash.');
-    if(candidate.categorySource==='manual')throw new Error('The candidate has manual categories. Existing classifications will not be overwritten.');
+    if(CatalogModel.hasManualClassification(candidate))throw new Error('The candidate has manual categories or attributes. Existing classifications will not be overwritten.');
     Object.assign(old,{path:candidate.path,size:candidate.size,lastModified:candidate.lastModified,present:true,sha256});
     // Keep the full displaced record for inspection/recovery, but never offer it as another missing file.
     candidate.present=false;candidate.mergedInto=old.id;

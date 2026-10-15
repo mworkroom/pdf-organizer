@@ -11,6 +11,9 @@ const CatalogModel = (() => {
     ['Home Accessories',''], ['Toy','toy,인형'], ['Small Accessories',''], ['Other',''], ['Unknown','']
   ];
   const idFor = name => name.toLowerCase().replaceAll(' ', '-');
+  const attributes=Object.freeze(['stockinette','stranded','texture']);
+  const attributeIds=ids=>attributes.filter(id=>Array.isArray(ids)&&ids.includes(id));
+  const hasManualClassification=pattern=>pattern.categorySource==='manual'||Boolean(pattern.attributeIds?.length);
   const create = () => ({version:1, revision:0, libraryId:crypto.randomUUID(), categories:definitions.map(([name, words])=>({id:idFor(name),name,keywords:words?words.split(','):[]})), patterns:[]});
   function categoryIds(ids, categories) {
     const known=new Set(categories.map(c=>c.id));
@@ -40,6 +43,7 @@ const CatalogModel = (() => {
       if(!p||typeof p.id!=='string'||!p.id||patterns.has(p.id)||typeof p.path!=='string'||!p.path||p.path.startsWith('/')||p.path.split('/').some(s=>!s||s==='.'||s==='..')||!Number.isFinite(p.size)||p.size<0||!Number.isFinite(p.lastModified)||typeof p.present!=='boolean'||!Array.isArray(p.categoryIds)||!p.categoryIds.length||p.categoryIds.some(id=>!ids.has(id))||new Set(p.categoryIds).size!==p.categoryIds.length|| (p.categoryIds.includes('unknown')&&p.categoryIds.length>1)||!['manual','filename','pdf-text'].includes(p.categorySource))fail();
       if(p.present&&livePaths.has(p.path))fail();
       if(p.representativePage!==undefined&&(!Number.isSafeInteger(p.representativePage)||p.representativePage<1))fail();
+      if(p.attributeIds!==undefined&&(!Array.isArray(p.attributeIds)||p.attributeIds.some(id=>!attributes.includes(id))||new Set(p.attributeIds).size!==p.attributeIds.length))fail();
       if(p.designerName!==undefined&&typeof p.designerName!=='string')fail();
       if(p.sha256!==undefined&&!/^[a-f0-9]{64}$/.test(p.sha256))fail();
       if(p.mergedInto!==undefined&&(typeof p.mergedInto!=='string'||!p.mergedInto||p.mergedInto===p.id||p.present))fail();
@@ -57,7 +61,7 @@ const CatalogModel = (() => {
       let pattern=existing.get(file.path);
       if(!pattern||pattern.size!==file.size||pattern.lastModified!==file.lastModified){
         // A replacement at the same path is a new pattern. Retain the old record for later repair.
-        pattern={id:crypto.randomUUID(),path:file.path,size:file.size,lastModified:file.lastModified,categoryIds:infer(file.name,next.categories),categorySource:'filename',representativePage:1};
+        pattern={id:crypto.randomUUID(),path:file.path,size:file.size,lastModified:file.lastModified,categoryIds:infer(file.name,next.categories),categorySource:'filename',attributeIds:[],representativePage:1};
         next.patterns.push(pattern);
       }
       pattern.present=true;
@@ -86,5 +90,15 @@ const CatalogModel = (() => {
     }
     return validate(next);
   }
-  return {create,validate,infer,categoryIds,reconcile,removeCategory,replaceCategories};
+  function replaceAttributes(catalog, patternIds, replacementIds) {
+    const targets=new Set(patternIds);
+    if(!targets.size)throw new Error('Select patterns first.');
+    if(!Array.isArray(replacementIds)||replacementIds.some(id=>!attributes.includes(id)))throw new Error('Choose valid replacement attributes.');
+    const present=new Set(catalog.patterns.filter(pattern=>pattern.present).map(pattern=>pattern.id));
+    if([...targets].some(id=>!present.has(id)))throw new Error('Selected patterns have changed. Refresh the library and select them again.');
+    const next=structuredClone(catalog),ids=attributeIds(replacementIds);
+    for(const pattern of next.patterns)if(targets.has(pattern.id))pattern.attributeIds=[...ids];
+    return validate(next);
+  }
+  return {create,validate,infer,categoryIds,reconcile,removeCategory,replaceCategories,attributes,attributeIds,replaceAttributes,hasManualClassification};
 })();

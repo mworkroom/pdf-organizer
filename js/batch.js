@@ -29,6 +29,7 @@ function normalizeReviewDraft(draft) {
   const names = new Set();
   const files = draft.files.map((file, index) => {
     if (typeof file.name !== "string" || names.has(file.name)) throw new Error("The file list in the saved review is invalid.");
+    if(file.attributeIds!==undefined&&(!Array.isArray(file.attributeIds)||CatalogModel.attributeIds(file.attributeIds).length!==file.attributeIds.length))throw new Error('The attributes in the saved review are invalid. Saved data will not be overwritten.');
     names.add(file.name);
     const role = draft.version === 1 ? (index < BATCH_LIMIT ? "current" : "queued") : file.role;
     if (!["current", "queued", "deferred"].includes(role)) throw new Error("The batch information in the saved review is invalid.");

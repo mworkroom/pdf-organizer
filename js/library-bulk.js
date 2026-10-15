@@ -1,5 +1,6 @@
 // Selection belongs to library metadata, independently of incoming file batches.
 let librarySelectionMode=false,librarySelectionId='',libraryBulkCategories=[],libraryBulkMessage='';
+let libraryBulkAttributes=[];
 const librarySelection=new Map();
 let libraryBulkCategoryKey='';
 const libraryPatternSignature=pattern=>JSON.stringify([pattern.path,pattern.size,pattern.lastModified]);
@@ -10,8 +11,9 @@ function clearLibrarySelection(message=''){
 function reconcileLibrarySelection(){
   const id=libraryCatalog?.libraryId||'';
   if(librarySelectionId!==id){
-    librarySelectionId=id;librarySelectionMode=false;libraryBulkCategories=[];clearLibrarySelection();
+    librarySelectionId=id;librarySelectionMode=false;libraryBulkCategories=[];libraryBulkAttributes=[];clearLibrarySelection();
     document.getElementById('libraryBulkCategoryPicker').replaceChildren();
+    document.getElementById('libraryBulkAttributePicker').replaceChildren();
   }
   const patterns=new Map((libraryCatalog?.patterns||[]).filter(pattern=>pattern.present).map(pattern=>[pattern.id,pattern]));
   for(const [id,signature] of librarySelection){
@@ -30,7 +32,7 @@ function addLibrarySelectionControl(card,pattern){
     if(input.checked)librarySelection.set(pattern.id,libraryPatternSignature(pattern));else librarySelection.delete(pattern.id);
     libraryBulkMessage='';renderLibraryBulkControls();
   };
-  card.querySelector('summary').prepend(label);
+  card.querySelector('.pattern-card-header').prepend(label);
 }
 function renderLibraryBulkControls(){
   const disabled=operationBusy||draftLockedElsewhere||gallerySearchPending||!libraryCatalog||Boolean(catalogError);
@@ -56,7 +58,13 @@ function renderLibraryBulkControls(){
     },'Replacement categories (select one or more)',true));
   }
   document.getElementById('applyLibraryCategoriesButton').disabled=disabled||!librarySelection.size||!libraryBulkCategories.length;
-  document.querySelectorAll('#libraryBulkCategoryPicker input,[data-library-selection]').forEach(input=>{
+  const attributeHost=document.getElementById('libraryBulkAttributePicker');
+  if(librarySelectionMode&&!attributeHost.children.length)attributeHost.append(attributePicker(libraryBulkAttributes,ids=>{
+    libraryBulkAttributes=ids;libraryBulkMessage='';renderLibraryBulkControls();
+  },'Replacement attributes'));
+  document.getElementById('applyLibraryAttributesButton').disabled=disabled||!librarySelection.size||!libraryBulkAttributes.length;
+  document.getElementById('clearLibraryAttributesButton').disabled=disabled||!librarySelection.size;
+  document.querySelectorAll('#libraryBulkCategoryPicker input,#libraryBulkAttributePicker input,[data-library-selection]').forEach(input=>{
     input.disabled=disabled;
     if(input.dataset.librarySelection){
       input.checked=librarySelection.has(input.dataset.librarySelection);
@@ -67,7 +75,10 @@ function renderLibraryBulkControls(){
 function setLibrarySelectionMode(enabled){
   if(operationBusy||draftLockedElsewhere||gallerySearchPending)return;
   librarySelectionMode=enabled;
-  if(!enabled){clearLibrarySelection();libraryBulkCategories=[];document.getElementById('libraryBulkCategoryPicker').replaceChildren();}
+  if(!enabled){
+    clearLibrarySelection();libraryBulkCategories=[];libraryBulkAttributes=[];
+    document.getElementById('libraryBulkCategoryPicker').replaceChildren();document.getElementById('libraryBulkAttributePicker').replaceChildren();
+  }
   renderLibraryPatterns();
 }
 function selectLibraryPatterns(allResults){
@@ -76,30 +87,38 @@ function selectLibraryPatterns(allResults){
   for(const pattern of patterns)librarySelection.set(pattern.id,libraryPatternSignature(pattern));
   libraryBulkMessage='';renderLibraryBulkControls();
 }
-async function applyLibraryCategories(){
+async function applyLibraryClassification(kind,clear=false){
   if(operationBusy||draftLockedElsewhere||gallerySearchPending)return;
   try{
     if(!libraryCatalog||catalogError)throw new Error(catalogError||'Connect a pattern folder first.');
-    if(categoryEditorDirty||libraryCategoryDrafts.size||libraryPageDrafts.size)throw new Error('Save or cancel individual category and cover page edits first.');
+    if(hasPendingLibraryEdits())throw new Error('Save or cancel individual category, attribute and cover page edits first.');
     const records=new Map(libraryCatalog.patterns.map(pattern=>[pattern.id,pattern]));
     for(const [id,signature] of librarySelection){
       const pattern=records.get(id);
       if(!pattern?.present||signature!==libraryPatternSignature(pattern))throw new Error('Selected patterns have changed. Select them again.');
     }
-    const next=CatalogModel.replaceCategories(libraryCatalog,[...librarySelection.keys()],libraryBulkCategories);
-    const count=librarySelection.size,names=libraryBulkCategories.map(id=>libraryCatalog.categories.find(category=>category.id===id).name).join(', ');
-    if(!window.confirm(`Replace the categories of ${count} selected patterns with ${names}?\n\nExisting categories will be replaced and saved as manual classifications. PDF files will not be moved or renamed.`))return;
+    const attributeChange=kind==='attributes',ids=attributeChange?(clear?[]:libraryBulkAttributes):libraryBulkCategories;
+    if(attributeChange&&!clear&&!ids.length)throw new Error('Choose replacement attributes or use Clear attributes.');
+    const next=attributeChange?CatalogModel.replaceAttributes(libraryCatalog,[...librarySelection.keys()],ids):CatalogModel.replaceCategories(libraryCatalog,[...librarySelection.keys()],ids);
+    const count=librarySelection.size,names=attributeChange?ids.join(', '):ids.map(id=>libraryCatalog.categories.find(category=>category.id===id).name).join(', ');
+    const confirmation=attributeChange?
+      `${clear?'Clear all attributes from':'Replace the attributes of'} ${count} selected patterns${clear?'':` with ${names}`}?\n\nExisting attributes will be replaced. Categories and PDF files will be preserved.`:
+      `Replace the categories of ${count} selected patterns with ${names}?\n\nExisting categories will be replaced and saved as manual classifications. PDF files will not be moved or renamed.`;
+    if(!window.confirm(confirmation))return;
     GalleryPreviews.suspend();setOperationBusy(true);
     try{
       await persistCatalog(next);
-      clearLibrarySelection(`Updated ${count} patterns · ${names}. Saved as manual categories.`);
+      clearLibrarySelection(attributeChange?`Updated ${count} patterns · Attributes: ${names||'none'}.`:`Updated ${count} patterns · ${names}. Saved as manual categories.`);
     }finally{setOperationBusy(false);renderLibraryPatterns();}
-  }catch(error){libraryBulkMessage=`Could not apply categories: ${error.message}`;renderLibraryBulkControls();}
+  }catch(error){libraryBulkMessage=`Could not apply ${kind}: ${error.message}`;renderLibraryBulkControls();}
 }
+async function applyLibraryCategories(){return applyLibraryClassification('categories');}
 function initializeLibraryBulkControls(){
   document.getElementById('librarySelectButton').onclick=()=>setLibrarySelectionMode(!librarySelectionMode);
   document.getElementById('selectLibraryPageButton').onclick=()=>selectLibraryPatterns(false);
   document.getElementById('selectLibraryResultsButton').onclick=()=>selectLibraryPatterns(true);
   document.getElementById('clearLibrarySelectionButton').onclick=()=>{clearLibrarySelection();renderLibraryBulkControls();};
   document.getElementById('applyLibraryCategoriesButton').onclick=applyLibraryCategories;
+  document.getElementById('applyLibraryAttributesButton').onclick=()=>applyLibraryClassification('attributes');
+  document.getElementById('clearLibraryAttributesButton').onclick=()=>applyLibraryClassification('attributes',true);
 }

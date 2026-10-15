@@ -77,7 +77,7 @@ const restoreDraftButton = document.getElementById("restoreDraftButton");
 const cancelDuplicateCheckButton = document.getElementById("cancelDuplicateCheckButton");
 const REVIEW_FIELDS = ["excluded", "destinationName", "selectedFolder",
   "sourceDesignerName", "sourceDesignerTouched", "patternFileName",
-  "patternManuallyEdited", "autoLinkedAlias", "specialFolderKey", "patternId", "categoryIds", "categorySource"];
+  "patternManuallyEdited", "autoLinkedAlias", "specialFolderKey", "patternId", "categoryIds", "categorySource", "attributeIds"];
 const draftReady = initializeDraft();
 
 retryDraftSaveButton.addEventListener("click", () => saveReviewDraft().catch(() => {}));
@@ -88,7 +88,7 @@ cancelDuplicateCheckButton.addEventListener("click", () => {
   executeStatus.textContent = "Canceling after the current file finishes...";
 });
 window.addEventListener("beforeunload", event => {
-  if (!draftLockedElsewhere && (draftRevision !== savedDraftRevision || operationBusy || categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size)) {
+  if (!draftLockedElsewhere && (draftRevision !== savedDraftRevision || operationBusy || hasPendingLibraryEdits())) {
     event.preventDefault();
     event.returnValue = "";
   }
@@ -242,8 +242,8 @@ duplicateCheckButton.addEventListener("click", async () => {
     return;
   }
 
-  if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) {
-    alert('Save or cancel category and cover page edits in Pattern Library first.');
+  if (hasPendingLibraryEdits()) {
+    alert('Save or cancel category, attribute and cover page edits in Pattern Library first.');
     setActiveView('library');
     return;
   }
@@ -324,8 +324,8 @@ executeButton.addEventListener("click", async () => {
     return;
   }
 
-  if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) {
-    alert('Save or cancel category and cover page edits in Pattern Library first.');
+  if (hasPendingLibraryEdits()) {
+    alert('Save or cancel category, attribute and cover page edits in Pattern Library first.');
     setActiveView('library');
     return;
   }

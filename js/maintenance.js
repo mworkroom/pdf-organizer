@@ -3,7 +3,7 @@ function resetMaintenance(){repairMissingId='';repairCandidateId='';repairProof=
 
 function maintenanceReady(){
   if(!libraryCatalog||catalogError)throw new Error(catalogError||'Connect a pattern folder.');
-  if(categoryEditorDirty||libraryCategoryDrafts.size||libraryPageDrafts.size)throw new Error('Save or cancel category and cover page edits first.');
+  if(hasPendingLibraryEdits())throw new Error('Save or cancel category, attribute and cover page edits first.');
 }
 function maintenanceStatus(message){
   maintenanceMessage=message;
@@ -18,7 +18,7 @@ function renderMaintenanceControls(){
 function renderMaintenance(){
   const host=document.getElementById('maintenanceContent');if(!host)return;
   const current=libraryCatalog?.patterns.filter(p=>p.present)||[];
-  host.innerHTML='<p class="note">Analyzes up to the first 3 pages of each organized PDF, one file at a time. Only clear titles are used for automatic classification; manual categories are preserved. Scanned PDFs without text are not processed with OCR.</p><p id="analysisSummary" class="note"></p><div class="maintenance-actions"><button id="startAnalysisButton" type="button" data-maintenance-control>Analyze remaining PDFs / resume</button><button id="retryAnalysisButton" type="button" class="secondary-button" data-maintenance-control>Retry failed PDFs</button><button id="pauseAnalysisButton" type="button" class="secondary-button" disabled>Pause analysis</button></div><p id="maintenanceStatus" class="note" role="status" aria-live="polite"></p><hr><h3>Relink PDFs moved or renamed outside the app</h3><p class="note">Refresh the library, then select a candidate with the same size as the missing pattern. Only the selected candidate is read to verify its hash. If no saved hash exists, check the file contents manually before relinking. Original PDFs are not moved or deleted.</p><div class="repair-fields"><label>Previous pattern<select id="repairMissing" class="text-input" data-maintenance-control></select></label><label>Current file candidate<select id="repairCandidate" class="text-input" data-maintenance-control></select></label></div><p id="repairEvidence" class="note" role="status"></p><label class="repair-confirm"><input id="repairConsent" type="checkbox" data-maintenance-control>I have checked that the previous pattern and the selected candidate are the same pattern.</label><div class="maintenance-actions"><button id="checkRepairButton" type="button" class="secondary-button" data-maintenance-control>Verify candidate hash</button><button id="applyRepairButton" type="button" data-maintenance-control>Save link to selected file</button></div>';
+  host.innerHTML='<p class="note">Analyzes up to the first 3 pages of each organized PDF, one file at a time. Only clear titles are used for automatic classification; manual categories and attributes are preserved. Scanned PDFs without text are not processed with OCR.</p><p id="analysisSummary" class="note"></p><div class="maintenance-actions"><button id="startAnalysisButton" type="button" data-maintenance-control>Analyze remaining PDFs / resume</button><button id="retryAnalysisButton" type="button" class="secondary-button" data-maintenance-control>Retry failed PDFs</button><button id="pauseAnalysisButton" type="button" class="secondary-button" disabled>Pause analysis</button></div><p id="maintenanceStatus" class="note" role="status" aria-live="polite"></p><hr><h3>Relink PDFs moved or renamed outside the app</h3><p class="note">Refresh the library, then select a candidate with the same size as the missing pattern. Only the selected candidate is read to verify its hash. If no saved hash exists, check the file contents manually before relinking. Original PDFs are not moved or deleted.</p><div class="repair-fields"><label>Previous pattern<select id="repairMissing" class="text-input" data-maintenance-control></select></label><label>Current file candidate<select id="repairCandidate" class="text-input" data-maintenance-control></select></label></div><p id="repairEvidence" class="note" role="status"></p><label class="repair-confirm"><input id="repairConsent" type="checkbox" data-maintenance-control>I have checked that the previous pattern and the selected candidate are the same pattern.</label><div class="maintenance-actions"><button id="checkRepairButton" type="button" class="secondary-button" data-maintenance-control>Verify candidate hash</button><button id="applyRepairButton" type="button" data-maintenance-control>Save link to selected file</button></div>';
   document.getElementById('analysisSummary').textContent=`Total: ${current.length} · Pending: ${current.filter(p=>!p.analysis).length} · Analyzed: ${current.filter(p=>p.analysis&&p.analysis.status!=='error').length} · Failed: ${current.filter(p=>p.analysis?.status==='error').length}`;
   document.getElementById('maintenanceStatus').textContent=maintenanceMessage;
   document.getElementById('startAnalysisButton').onclick=()=>runTextAnalysis(false);
@@ -42,7 +42,7 @@ function populateRepairCandidates(){
   const select=document.getElementById('repairCandidate');select.replaceChildren(new Option('Select a current file',''));
   const old=libraryCatalog?.patterns.find(p=>p.id===repairMissingId);
   const candidates=old?MaintenanceModel.candidates(libraryCatalog,old):[];
-  for(const p of candidates)select.add(new Option(`${p.path}${p.categorySource==='manual'?' · Has manual categories':''}`,p.id));
+  for(const p of candidates)select.add(new Option(`${p.path}${CatalogModel.hasManualClassification(p)?' · Has manual categories or attributes':''}`,p.id));
   if(!candidates.some(p=>p.id===repairCandidateId))repairCandidateId='';select.value=repairCandidateId;
   renderRepairEvidence();
 }
@@ -50,7 +50,7 @@ function renderRepairEvidence(){
   const old=libraryCatalog?.patterns.find(p=>p.id===repairMissingId),candidate=libraryCatalog?.patterns.find(p=>p.id===repairCandidateId);
   document.getElementById('repairConsent').checked=false;
   const evidence=document.getElementById('repairEvidence');
-  evidence.textContent=!old?'Select a previous pattern to recover.':!candidate?`Previous file: ${old.size.toLocaleString('en-GB')} bytes · Same-size candidates: ${MaintenanceModel.candidates(libraryCatalog,old).length}. If none are available, check the original file or a separate backup.`:candidate.categorySource==='manual'?'Relinking is blocked because the candidate has manual categories. Check both patterns before continuing.':repairProof?(old.sha256?(repairProof.hash===old.sha256?'SHA-256 match. Check the contents, then save the link.':'SHA-256 mismatch. This candidate cannot be linked.'):'No previous hash. File identity cannot be verified automatically. Relink only after checking the original contents manually.'):'Only the file size matches so far. Select Verify candidate hash first.';
+  evidence.textContent=!old?'Select a previous pattern to recover.':!candidate?`Previous file: ${old.size.toLocaleString('en-GB')} bytes · Same-size candidates: ${MaintenanceModel.candidates(libraryCatalog,old).length}. If none are available, check the original file or a separate backup.`:CatalogModel.hasManualClassification(candidate)?'Relinking is blocked because the candidate has manual categories or attributes. Check both patterns before continuing.':repairProof?(old.sha256?(repairProof.hash===old.sha256?'SHA-256 match. Check the contents, then save the link.':'SHA-256 mismatch. This candidate cannot be linked.'):'No previous hash. File identity cannot be verified automatically. Relink only after checking the original contents manually.'):'Only the file size matches so far. Select Verify candidate hash first.';
   if(old&&candidate)evidence.textContent=`Previous: ${old.path} → Current: ${candidate.path} · ${evidence.textContent}`;
 }
 async function checkedLibraryFile(pattern){
@@ -110,7 +110,7 @@ async function repairAction(apply){
   try{
     maintenanceReady();old=libraryCatalog.patterns.find(p=>p.id===repairMissingId);candidate=libraryCatalog.patterns.find(p=>p.id===repairCandidateId);
     if(!old||old.present||!candidate?.present)throw new Error('Select a previous pattern and a current candidate.');
-    if(candidate.categorySource==='manual')throw new Error('Check the candidate file’s manual categories first.');
+    if(CatalogModel.hasManualClassification(candidate))throw new Error('Check the candidate file’s manual categories or attributes first.');
     if(apply&&(!repairProof||repairProof.libraryId!==libraryCatalog.libraryId||repairProof.old!==old.id||repairProof.candidate!==candidate.id))throw new Error('Select Verify candidate hash first.');
     if(apply&&(!document.getElementById('repairConsent').checked))throw new Error('Check that both files are the same pattern, then select the confirmation checkbox.');
     if(apply&&old.sha256&&old.sha256!==repairProof.hash)throw new Error('The file does not match the saved hash.');

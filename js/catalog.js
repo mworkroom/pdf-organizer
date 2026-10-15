@@ -4,9 +4,11 @@ let libraryCatalog=null, catalogRoot=null, catalogDiskText=null, catalogError=''
 let indexedLibraryFiles=[], libraryPage=0;
 let categoryEditorDirty=false;
 const libraryCategoryDrafts=new Map();
+const libraryAttributeDrafts=new Map();
 const defaultCategories=CatalogModel.create().categories;
 
 function availableCategories(){return libraryCatalog?.categories || defaultCategories;}
+function hasPendingLibraryEdits(){return Boolean(categoryEditorDirty||libraryCategoryDrafts.size||libraryAttributeDrafts.size||libraryPageDrafts.size);}
 function setCatalogStatus(message){document.getElementById('catalogStatus').textContent=message;}
 async function readCatalogText(root){
   try{return await (await root.getFileHandle(CATALOG_FILE_NAME)).getFile().then(file=>file.text());}
@@ -33,7 +35,7 @@ async function persistCatalog(next){
 }
 async function loadLibraryCatalog(){
   const root=libraryDirectoryHandle;
-  if(categoryEditorDirty||libraryCategoryDrafts.size||libraryPageDrafts.size)throw new Error('Save or cancel category and cover page edits before reconnecting the library.');
+  if(hasPendingLibraryEdits())throw new Error('Save or cancel category, attribute and cover page edits before reconnecting the library.');
   if(typeof resetMaintenance==='function')resetMaintenance();
   libraryCatalog=null;indexedLibraryFiles=[];catalogRoot=root;catalogError='';
   setCatalogStatus('Checking the pattern library and metadata...');
@@ -66,6 +68,7 @@ async function loadLibraryCatalog(){
 function inferReviewCategories(file){
   file.patternId ||= crypto.randomUUID();
   file.categoryIds=CatalogModel.categoryIds(file.categoryIds,availableCategories());
+  file.attributeIds=CatalogModel.attributeIds(file.attributeIds);
   if(file.categorySource!=='manual'){
     file.categoryIds=CatalogModel.infer(file.patternFileName||file.name,availableCategories());file.categorySource='filename';
   }
@@ -89,6 +92,20 @@ function categoryPicker(ids,onChange,label='Category',allowEmpty=false){
   }
   return field;
 }
+function attributePicker(ids,onChange,label='Attributes'){
+  const field=document.createElement('fieldset');field.className='category-picker attribute-picker';
+  const legend=document.createElement('legend');legend.textContent=label;field.append(legend);
+  const selected=CatalogModel.attributeIds(ids);
+  for(const id of CatalogModel.attributes){
+    const item=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span');
+    input.type='checkbox';input.value=id;input.checked=selected.includes(id);input.disabled=draftLockedElsewhere;
+    name.textContent=id;item.append(input,name);field.append(item);
+    input.onchange=()=>{
+      onChange(CatalogModel.attributeIds([...field.querySelectorAll('input:checked')].map(control=>control.value)));
+    };
+  }
+  return field;
+}
 function renderReviewCategories(file){
   inferReviewCategories(file);
   const section=document.createElement('div');section.className='review-categories';
@@ -100,6 +117,7 @@ function renderReviewCategories(file){
     inferReviewCategories(file);file.rowElement?.querySelector('.review-categories')?.replaceWith(renderReviewCategories(file));scheduleDraftSave();
   });
   section.append(hint,reanalyze);
+  section.append(attributePicker(file.attributeIds,ids=>{file.attributeIds=ids;scheduleDraftSave();}));
   if(file.excluded)section.querySelectorAll('input,button').forEach(control=>control.disabled=true);
   return section;
 }
@@ -179,7 +197,7 @@ async function persistMovedPattern(plan,copiedFile,sha256){
   if(!isIncoming&&!pattern)throw new Error(`Could not find metadata for the pattern to move: ${plan.sourcePath}`);
   if(!pattern){
     const review=downloadFiles.find(file=>file.name===plan.sourceName);inferReviewCategories(review);
-    pattern={id:review.patternId||crypto.randomUUID(),categoryIds:[...review.categoryIds],categorySource:review.categorySource,representativePage:1};next.patterns.push(pattern);
+    pattern={id:review.patternId||crypto.randomUUID(),categoryIds:[...review.categoryIds],categorySource:review.categorySource,attributeIds:[...review.attributeIds],representativePage:1};next.patterns.push(pattern);
   }
   if(!isIncoming){
     const source=await (await plan.sourceDirectory.getFileHandle(plan.sourceName)).getFile();

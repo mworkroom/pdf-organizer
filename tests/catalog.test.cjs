@@ -86,10 +86,11 @@ function setupIO(){
   return {...state,root,source,target};
 }
 test('successful move persists manual classification before removing original',async()=>{
-  const {run,source,target,root}=setupIO();await run('copyFileThenRemoveOriginal(plan)');
+  const {run,source,target,root}=setupIO();run('downloadFiles[0].attributeIds=["stockinette","stranded"];');await run('copyFileThenRemoveOriginal(plan)');
   assert.equal(source.files.size,0);assert.equal(target.files.size,1);
   const p=JSON.parse(root.files.get('!pdf-organizer-library.json').data).patterns[0];
   assert.equal(p.id,'incoming-id');assert.deepEqual(p.categoryIds,['hat','scarf']);assert.equal(p.path,'Designer/a.pdf');
+  assert.deepEqual(p.attributeIds,['stockinette','stranded']);
   assert.equal(p.sha256,require('node:crypto').createHash('sha256').update('1234567890').digest('hex'));
 });
 test('metadata write failure leaves original and removes newly copied PDF',async()=>{

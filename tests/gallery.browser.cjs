@@ -7,7 +7,7 @@ async function main(){
   const report=async()=>JSON.parse(await page.locator('#qaReport').textContent());
   const wait=(predicate,arg)=>page.waitForFunction(predicate,arg);
   const search=async text=>{await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill(text);await wait(value=>document.querySelector('#libraryPatternList').dataset.query===value,text);};
-  const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater.pdf'});
+  const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater'});
   const readyRoot=()=>wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready'&&document.querySelectorAll('.library-pattern').length===1);
   try{
     await page.goto((process.env.PDF_ORGANIZER_TEST_URL||'http://127.0.0.1:8766/')+'?qa=1');await button('Prepare 131 gallery samples').click();
@@ -15,23 +15,49 @@ async function main(){
     assert.equal((await report()).pdfStats.reads,0);assert.equal((await report()).galleryCards,24);
     await button('Pattern Library').click();await wait(()=>document.querySelector('.library-pattern[data-preview="ready"]'));
     assert.ok((await report()).pdfStats.reads<131);
+    // Card actions are independent: the preview/body do not open the editor.
+    await search('Root_Sweater');await readyRoot();
+    const first=()=>page.locator('.library-pattern').first();
+    await first().locator('.pattern-thumbnail').click({position:{x:20,y:20}});
+    await first().locator('.category-labels').click();assert.equal(await page.locator('.library-pattern.is-editing').count(),0);
+    assert.equal(await page.locator('.pattern-path,.pattern-page-caption,.pattern-edit-hint').count(),0);
+    // Use the actual PDF-opening path, including a native Chrome popup and blob bytes.
+    const popupPromise=page.waitForEvent('popup');await first().locator('.pattern-title').focus();await page.keyboard.press('Enter');
+    const pdfPopup=await popupPromise;await pdfPopup.waitForURL(url=>url.protocol==='blob:');
+    assert.equal(await page.evaluate(async url=>(await (await fetch(url)).text()).startsWith('%PDF'),pdfPopup.url()),true);await pdfPopup.close();
+    assert.equal(await page.locator('.library-pattern.is-editing').count(),0);
+    await first().getByRole('button',{name:'Edit',exact:true}).focus();await page.keyboard.press('Enter');
+    assert.equal(await first().getByRole('button',{name:'Close editor',exact:true}).getAttribute('aria-expanded'),'true');
+    assert.equal(await first().locator('.gallery-editor').isVisible(),true);assert.equal(await first().locator('.pattern-path').isVisible(),true);
+    await first().getByRole('button',{name:'Close editor',exact:true}).click();assert.equal(await first().locator('.gallery-editor').isVisible(),false);
+    await button('Clear filters').click();await button('Select patterns').click();await button('Select all 131 results').click();await button('Next').click();
+    const chosenDesigner=await first().locator('.pattern-designer').innerText();await first().locator('.pattern-designer').click();
+    assert.equal(await page.getByRole('combobox',{name:'Designer',exact:true}).inputValue(),chosenDesigner);
+    assert.match(await page.locator('#libraryPageSummary').innerText(),/Page 1/);assert.equal(await page.locator('#librarySelectionCount').innerText(),'0 selected');
+    assert.equal(await page.locator('.library-pattern.is-editing').count(),0);await button('Done selecting').click();await button('Clear filters').click();
+    await search('Una_Hat');await page.locator('.pattern-designer').click();
+    assert.equal(await page.getByRole('combobox',{name:'Designer',exact:true}).inputValue(),'Una');assert.equal(await page.locator('.library-pattern').count(),1);
+    assert.equal(await page.getByRole('searchbox',{name:'Search patterns',exact:true}).inputValue(),'Una_Hat');
+    await first().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await first().locator('.pattern-path').innerText(),/!zz_Singles\/Una_Hat.pdf/);
+    await button('Clear filters').click();
+
     await page.getByRole('combobox',{name:'Category',exact:true}).selectOption('hat');await page.getByRole('combobox',{name:'Designer',exact:true}).selectOption('Alice Knits');await search('sweater');
     await wait(()=>document.querySelectorAll('.library-pattern').length===1);assert.match(await page.locator('#libraryPatternList').innerText(),/Sweater_000/);
-    const multiple=page.locator('.library-pattern');await multiple.locator('summary').click();await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).check();
+    const multiple=page.locator('.library-pattern');await multiple.getByRole('button',{name:'Edit',exact:true}).click();await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).check();
     await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill('no such pattern');await wait(()=>document.querySelectorAll('.library-pattern').length===0);
     await search('sweater');await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).waitFor();assert.equal(await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).isChecked(),true);await button('Cancel changes').click();
     await button('Clear filters').click();await wait(()=>document.querySelectorAll('.library-pattern').length===24);await button('Next').click();await wait(()=>document.querySelector('#libraryPageSummary').textContent.includes('2 / 6'));
-    await search('Root_Sweater');await readyRoot();assert.match(await root().innerText(),/2 pages/);
-    await root().locator('summary').click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('2');
+    await search('Root_Sweater');await readyRoot();assert.equal(await root().locator('.pattern-page-caption').count(),0);
+    await root().getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('2');
     await button('Refresh library').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('Save or cancel'));assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');
     await search('Broken');await search('Root_Sweater');await readyRoot();assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');await button('Save cover page').click();
-    await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).representatives.some(p=>p.path==='Root_Sweater.pdf'&&p.page===2));await readyRoot();assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);
+    await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).representatives.some(p=>p.path==='Root_Sweater.pdf'&&p.page===2));await readyRoot();await root().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);await root().getByRole('button',{name:'Close editor',exact:true}).click();
     const originalId=(await report()).representatives[0].id;
     const readsBeforeClear=(await report()).pdfStats.reads;await button('Clear thumbnail cache').click();await wait(before=>JSON.parse(document.querySelector('#qaReport').textContent).pdfStats.reads>before,readsBeforeClear);await readyRoot();assert.equal((await report()).representatives[0].id,originalId);
-    await root().locator('summary').click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('99');await button('Save cover page').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('1~2'));assert.equal((await report()).representatives[0].page,2);
+    await root().getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('99');await button('Save cover page').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('1~2'));assert.equal((await report()).representatives[0].page,2);
     assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'99');await button('Cancel changes').click();
     await page.reload();await button('Reconnect sample library').click();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===131);await search('Root_Sweater');await readyRoot();
-    assert.equal((await report()).representatives[0].id,originalId);assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);
+    assert.equal((await report()).representatives[0].id,originalId);await root().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);await root().getByRole('button',{name:'Close editor',exact:true}).click();
     await button('List').click();await readyRoot();assert.match(await page.locator('#libraryPatternList').getAttribute('class'),/list-view/);await button('Gallery').click();await readyRoot();
     await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).previewStats.hits>0);assert.equal((await report()).pdfStats.maxActive<=1,true);
     await search('Broken');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='error');assert.equal(await button('Retry preview').isVisible(),true);assert.equal((await report()).galleryTotal,131);
@@ -47,12 +73,48 @@ async function main(){
     for(const width of [2048,1280]){
       await page.setViewportSize({width,height:1152});await page.locator('.gallery-panel').scrollIntoViewIfNeeded();await wait(()=>[...document.querySelectorAll('.library-pattern')].filter(card=>card.getBoundingClientRect().top<innerHeight+100&&card.getBoundingClientRect().bottom>-100).every(card=>card.dataset.preview!=='pending'));
       const layout=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,inputSize:parseFloat(getComputedStyle(document.querySelector('#librarySearch')).fontSize),titleSize:parseFloat(getComputedStyle(document.querySelector('.pattern-title')).fontSize),overlaps:[...document.querySelectorAll('.gallery-toolbar button,.gallery-toolbar select')].some(element=>element.getBoundingClientRect().right>innerWidth)}));
+      const geometry=await page.evaluate(()=>{
+        const cards=[...document.querySelectorAll('.library-pattern')],top=cards[0].getBoundingClientRect().top,thumb=cards[0].querySelector('.pattern-thumbnail').getBoundingClientRect(),edit=cards[0].querySelector('.pattern-edit-button').getBoundingClientRect();
+        return {columns:cards.filter(card=>Math.abs(card.getBoundingClientRect().top-top)<2).length,ratio:thumb.height/thumb.width,fit:getComputedStyle(cards[0].querySelector('img')).objectFit,editInside:edit.right<=thumb.right&&edit.bottom<=thumb.bottom&&thumb.right-edit.right<12&&thumb.bottom-edit.bottom<12,hiddenInfo:document.querySelectorAll('.pattern-card-header .pattern-path,.pattern-card-header .pattern-page-caption').length};
+      });
+      assert.equal(geometry.columns,width===2048?7:4);assert.ok(Math.abs(geometry.ratio-Math.SQRT2)<0.02);assert.equal(geometry.fit,'cover');assert.equal(geometry.editInside,true);assert.equal(geometry.hiddenInfo,0);
       assert.equal(layout.width,layout.scroll);assert.ok(layout.inputSize>=16&&layout.titleSize>=16);assert.equal(layout.overlaps,false);
-      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-step4-gallery-${width}.png`)});
+      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-compact-gallery-${width}.png`)});
+    }
+    // Add real OPFS files for long-name wrapping and landscape cropping checks.
+    await page.evaluate(async()=>{
+      const source=await (await (await libraryDirectoryHandle.getFileHandle('Root_Sweater.pdf')).getFile()).text();
+      const singles=await libraryDirectoryHandle.getDirectoryHandle('!zz_Singles');
+      for(const [folder,name,content] of [[singles,'11wildswans_Unbound by Annamária Ötvös (11wildswans).pdf',source],[libraryDirectoryHandle,'Landscape_Sweater.pdf',source.replaceAll('/MediaBox [0 0 400 600]','/MediaBox [0 0 600 400]')]]){
+        const writable=await (await folder.getFileHandle(name,{create:true})).createWritable();await writable.write(content);await writable.close();
+      }
+    });
+    await button('Clear filters').click();await button('Refresh library').click();await wait(()=>libraryCatalog?.patterns.filter(p=>p.present).length===133);
+    await search('Landscape_Sweater');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready');
+    const landscape=await page.locator('.pattern-thumbnail img').evaluate(img=>({wide:img.naturalWidth>img.naturalHeight,fit:getComputedStyle(img).objectFit}));assert.equal(landscape.wide,true);assert.equal(landscape.fit,'cover');
+    await search('Unbound');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready');
+    for(const width of [2048,1760,1280,390]){
+      await page.setViewportSize({width,height:width===390?844:1152});
+      const wrapped=await page.locator('.library-pattern').evaluate(card=>{
+        const title=card.querySelector('.pattern-title'),header=card.querySelector('.pattern-card-header'),edit=card.querySelector('.pattern-edit-button'),thumb=card.querySelector('.pattern-thumbnail');
+        return {noOverflow:document.documentElement.scrollWidth===innerWidth,titleFits:title.scrollWidth<=title.clientWidth+1,titleSize:parseFloat(getComputedStyle(title).fontSize),noDuplicatePath:header.querySelectorAll('.pattern-path,.pattern-page-caption').length,editVisible:edit.getBoundingClientRect().right<=thumb.getBoundingClientRect().right};
+      });
+      assert.equal(wrapped.noOverflow,true);assert.equal(wrapped.titleFits,true);assert.ok(wrapped.titleSize>=16);assert.equal(wrapped.noDuplicatePath,0);assert.equal(wrapped.editVisible,true);
+      await button('List').click();await page.locator('.pattern-edit-button').click();assert.equal(await page.locator('.gallery-editor').isVisible(),true);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth),true);await page.getByRole('button',{name:'Close editor',exact:true}).click();await button('Gallery').click();
+    }
+    // Remove the intentionally corrupt test file before capturing the normal browsing state.
+    await page.evaluate(()=>libraryDirectoryHandle.removeEntry('Broken.pdf'));
+    await button('Clear filters').click();await button('Refresh library').click();await wait(()=>libraryCatalog?.patterns.filter(p=>p.present).length===132);
+    // Show the seven-column result from the top of the panel, with long-name and landscape samples included.
+    for(const width of [2048,1280]){
+      await page.setViewportSize({width,height:1152});await page.locator('.gallery-panel').evaluate(el=>window.scrollTo(0,el.getBoundingClientRect().top+scrollY-16));
+      await wait(()=>[...document.querySelectorAll('.library-pattern')].filter(card=>card.getBoundingClientRect().top<innerHeight+100&&card.getBoundingClientRect().bottom>-100).every(card=>card.dataset.preview!=='pending'));
+      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-compact-gallery-${width}.png`)});
     }
     assert.deepEqual(errors,[]);assert.ok(requests.every(url=>url.startsWith('http://127.0.0.1:8766/')||url.startsWith('blob:http://127.0.0.1:8766/')));
     await button('End sample session').click();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===0);
-    console.log(JSON.stringify({result:'PASS',pdfs:131,pageSize:24,workerConcurrency:1,cache:limits,viewports:[2048,1280],unexpectedErrors:errors.length,externalRequests:0}));
+    console.log(JSON.stringify({result:'PASS',pdfs:131,pageSize:24,workerConcurrency:1,cache:limits,viewports:[2048,1760,1280,390],additionalLayoutSamples:2,unexpectedErrors:errors.length,externalRequests:0}));
   }finally{await context.close();await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

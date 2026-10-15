@@ -22,9 +22,20 @@ async function main(){
     assert.equal(await page.title(),'PDF Organizer');assert.equal(await page.locator('html').getAttribute('lang'),'en');
     await button('Prepare 200 samples').click();await wait(()=>document.querySelectorAll('#sortingList .sort-row').length===100);
     assert.equal(await page.locator('#reviewFileList,#bulkDesignerInput,#applyBulkCategoriesButton').count(),0);
+    // Match a real library with 27 categories, including longer custom labels.
+    await page.evaluate(async()=>{
+      const next=structuredClone(libraryCatalog);
+      for(const name of ['Blouse','Guidebook','Stitch Dictionary','Crochet'])next.categories.push({id:name.toLowerCase().replaceAll(' ','-'),name,keywords:[]});
+      await persistCatalog(next);renderCatalogUI();renderSortingRows();
+    });
+    assert.equal(await row(0).locator('.filename-editor').getAttribute('open'),null);
+    assert.equal(await row(0).getByText('Organized pattern filename',{exact:true}).count(),0);
+    await row(0).locator('.filename-editor > summary').click();
+    await row(1).locator('.filename-editor > summary').click();
     await row(0).getByRole('textbox',{name:'Pattern filename for Designer_Pattern_000.pdf',exact:true}).fill('First manual.pdf');
     await row(1).getByRole('textbox',{name:'Pattern filename for Designer_Pattern_001.pdf',exact:true}).fill('Second manual.pdf');
     await row(1).getByRole('checkbox',{name:'Hat',exact:true}).check();
+    await row(2).locator('.filename-editor > summary').click();
     await row(2).getByRole('checkbox',{name:'Exclude from this run',exact:true}).check();
     assert.equal(await row(2).getByRole('textbox',{name:'Pattern filename for Designer_Pattern_002.pdf',exact:true}).isEnabled(),false);
     await row(2).getByRole('checkbox',{name:'Exclude from this run',exact:true}).uncheck();
@@ -37,11 +48,25 @@ async function main(){
     await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).queued===100);
     for(const width of [2048,1280]){
       await page.setViewportSize({width,height:1152});await row(0).scrollIntoViewIfNeeded();
-      const layout=await row(0).evaluate(element=>({width:innerWidth,scroll:document.documentElement.scrollWidth,fields:[...element.querySelectorAll('.text-input')].map(input=>({size:parseFloat(getComputedStyle(input).fontSize),left:input.getBoundingClientRect().left,right:input.getBoundingClientRect().right})),cards:document.querySelectorAll('#sortingList .sort-row').length}));
+      const layout=await row(0).evaluate(element=>{
+        const naming=element.querySelector('.sort-grid').getBoundingClientRect(),categories=element.querySelector('.review-categories').getBoundingClientRect();
+        return {width:innerWidth,scroll:document.documentElement.scrollWidth,height:element.getBoundingClientRect().height,viewportHeight:innerHeight,ratio:naming.width/(naming.width+categories.width),categoryLeft:categories.left,namingRight:naming.right,topDifference:Math.abs(naming.top-categories.top),categoryCount:element.querySelectorAll('.review-categories .category-picker:not(.attribute-picker) input').length,fields:[...element.querySelectorAll('.text-input')].map(input=>({size:parseFloat(getComputedStyle(input).fontSize),left:input.getBoundingClientRect().left,right:input.getBoundingClientRect().right})),cards:document.querySelectorAll('#sortingList .sort-row').length};
+      });
       assert.equal(layout.width,layout.scroll);assert.equal(layout.cards,100);assert.ok(layout.fields.every(field=>field.size>=16&&field.left>=0&&field.right<=width));
+      assert.ok(layout.ratio>=0.66&&layout.ratio<=0.72);assert.ok(layout.categoryLeft>layout.namingRight);assert.ok(layout.topDifference<2);assert.equal(layout.categoryCount,27);assert.ok(layout.height<layout.viewportHeight-32);
       await row(0).evaluate(element=>window.scrollTo(0,element.getBoundingClientRect().top+scrollY-16));
-      await artifact(`pdf-organizer-continuous-review-${width}.png`);
+      await artifact(`pdf-organizer-review-70-30-${width}.png`);
+      await row(0).locator('.filename-editor > summary').click();
+      await artifact(`pdf-organizer-review-70-30-default-${width}.png`);
+      await row(0).locator('.filename-editor > summary').click();
     }
+    // Missing filenames remain discoverable when the optional editor is collapsed.
+    await row(0).getByRole('textbox',{name:'Pattern filename for Designer_Pattern_000.pdf',exact:true}).fill('');
+    await row(0).locator('.filename-editor > summary').click();
+    await button('Check duplicates').click();
+    await wait(()=>document.activeElement?.getAttribute('aria-label')==='Pattern filename for Designer_Pattern_000.pdf');
+    assert.notEqual(await row(0).locator('.filename-editor').getAttribute('open'),null);
+    await row(0).getByRole('textbox',{name:'Pattern filename for Designer_Pattern_000.pdf',exact:true}).fill('First manual.pdf');
     await button('End sample session').click();
     await button('Prepare 131 gallery samples').click();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===131);
     // Prepare a realistic backlog: 42 existing unclassified PDFs from one designer.
@@ -56,11 +81,11 @@ async function main(){
     assert.match(await page.locator('#libraryPageSummary').innerText(),/42 results/);
     const before=await page.evaluate(()=>structuredClone(libraryCatalog));
     await button('Select patterns').click();await button('Select this page (24)').click();await count(24);
-    assert.equal(await page.locator('.library-pattern[open]').count(),0);
+    assert.equal(await page.locator('.library-pattern.is-editing').count(),0);
     await button('Next').click();await count(24);assert.equal(await page.locator('[data-library-selection]:checked').count(),0);
     await button('Select this page (18)').click();await count(42);
     await button('Previous').click();await page.locator('[data-library-selection]').first().uncheck();await count(41);
-    assert.equal(await page.locator('.library-pattern[open]').count(),0);
+    assert.equal(await page.locator('.library-pattern.is-editing').count(),0);
     await button('List').click();await count(41);await button('Gallery').click();await count(41);
     await page.getByRole('combobox',{name:'Sort by',exact:true}).selectOption('designer');await count(41);
     await button('Select all 42 results').click();await count(42);
@@ -72,7 +97,7 @@ async function main(){
     const targetIds=await page.evaluate(()=>[...librarySelection.keys()]);
     await picker().getByRole('checkbox',{name:'Socks',exact:true}).check();await picker().getByRole('checkbox',{name:'Shawl',exact:true}).check();
     // Unsaved individual edits must be resolved explicitly; bulk editing cannot replace them.
-    const firstCard=page.locator('.library-pattern').first();await firstCard.locator('summary').click();await firstCard.getByRole('checkbox',{name:'Hat',exact:true}).check();
+    const firstCard=page.locator('.library-pattern').first();await firstCard.getByRole('button',{name:'Edit',exact:true}).click();await firstCard.getByRole('checkbox',{name:'Hat',exact:true}).check();
     await button('Apply categories').click();assert.match(await page.locator('#libraryBulkStatus').innerText(),/Save or cancel/);await count(41);
     await firstCard.getByRole('button',{name:'Cancel changes',exact:true}).click();
     // A canceled confirmation leaves the JSON untouched.

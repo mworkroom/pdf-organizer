@@ -73,7 +73,7 @@ async function saveReviewDraft() {
 }
 
 async function prepareFolderChange(handle, currentHandle) {
-  if (categoryEditorDirty || libraryCategoryDrafts.size || libraryPageDrafts.size) throw new Error('Save or cancel category and cover page edits first.');
+  if (hasPendingLibraryEdits()) throw new Error('Save or cancel category, attribute and cover page edits first.');
   if (!await draftReady) throw new Error("Wait for the review storage check, then try again.");
   await saveReviewDraft();
   const sameFolder = currentHandle && await currentHandle.isSameEntry(handle);

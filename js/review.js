@@ -53,6 +53,8 @@ function validateCompletenessAndFocus() {
     }
     if (!ensurePdfExtension(file.patternFileName.trim())) {
       file.patternInputElement?.classList.add("incomplete-input");
+      const editor = file.rowElement?.querySelector('.filename-editor');
+      if (editor) editor.open = true;
     }
   });
 
@@ -151,6 +153,8 @@ function renderReviewCards() {
 
     const grid = document.createElement("div");
     grid.className = "sort-grid";
+    const body = document.createElement('div');
+    body.className = 'review-card-body';
 
     const destinationField = document.createElement("div");
     destinationField.className = "field";
@@ -202,9 +206,6 @@ function renderReviewCards() {
 
     const sourceDesignerHint = document.createElement("div");
     sourceDesignerHint.className = "field-hint";
-    sourceDesignerHint.textContent =
-      "This name is removed from the source filename. Select an existing designer to save this spelling as an alias.";
-
     const rememberButton = document.createElement("button");
     rememberButton.type = "button";
     rememberButton.className = "secondary-button remember-button";
@@ -222,7 +223,7 @@ function renderReviewCards() {
 
     const patternLabel = document.createElement("label");
     patternLabel.className = "field-label";
-    patternLabel.textContent = "Organized pattern filename";
+    patternLabel.textContent = "Filename";
 
     const patternInput = document.createElement("input");
     patternInput.className = "text-input";
@@ -263,16 +264,22 @@ function renderReviewCards() {
     previewField.appendChild(previewLabel);
     previewField.appendChild(preview);
     previewField.appendChild(status);
+    const filenameEditor = document.createElement('details');
+    filenameEditor.className = 'filename-editor';
+    filenameEditor.open = file.patternManuallyEdited || !file.patternFileName.trim();
+    const filenameSummary = document.createElement('summary');
+    filenameSummary.textContent = 'Edit filename';
+    filenameEditor.append(filenameSummary, patternField);
+    previewField.appendChild(filenameEditor);
 
     grid.appendChild(destinationField);
     grid.appendChild(sourceDesignerField);
-    grid.appendChild(patternField);
 
     grid.appendChild(previewField);
 
     row.appendChild(sourceHeader);
-    row.appendChild(grid);
-    row.appendChild(renderReviewCategories(file));
+    body.append(grid, renderReviewCategories(file));
+    row.appendChild(body);
     sortingList.appendChild(row);
 
     excludeCheckbox.addEventListener("change", () => {

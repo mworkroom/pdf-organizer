@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
 
-  <link rel="stylesheet" href="css/style.css?v=20261016-roles">
+  <link rel="stylesheet" href="css/style.css?v=20261016-gallery-cards">
 </head>
 
 <body>
@@ -103,14 +103,16 @@
     <section class="panel"><details id="libraryMaintenance"><summary class="section-summary">PDF text analysis and relinking</summary><div id="maintenanceContent"></div></details></section>
     <section class="panel gallery-panel">
       <div class="panel-header"><div><h2>Pattern Library</h2><p id="catalogStatus" class="note" role="status" aria-live="polite">Connect a pattern folder.</p></div><button id="refreshLibraryButton" class="secondary-button" type="button" disabled>Refresh library</button></div>
-      <div class="gallery-search"><label for="librarySearch">Search patterns</label><input id="librarySearch" type="search" class="text-input" placeholder="Search filenames, designers, and categories" disabled></div>
-      <div class="gallery-toolbar"><label>Category<select id="libraryCategoryFilter" class="text-input" disabled><option value="">All categories</option></select></label><label>Designer<select id="libraryDesignerFilter" class="text-input" disabled><option value="">All designers</option></select></label><label>Sort by<select id="librarySort" class="text-input" disabled><option value="name">File name</option><option value="designer">Designer</option><option value="recent">Last modified</option></select></label><button id="clearGalleryFiltersButton" class="secondary-button" type="button" disabled>Clear filters</button><div class="gallery-view-options" role="group" aria-label="Library view"><button id="galleryGridButton" class="secondary-button" type="button" aria-pressed="true" disabled>Gallery</button><button id="galleryListButton" class="secondary-button" type="button" aria-pressed="false" disabled>List</button></div></div>
-      <div class="library-selection-entry"><button id="librarySelectButton" class="secondary-button" type="button" aria-pressed="false" aria-controls="libraryBulkTools" disabled>Select patterns</button><p class="note">Filter by category and designer to classify existing patterns together.</p></div>
-      <section id="libraryBulkTools" class="library-bulk-tools hidden" aria-label="Bulk category editing">
+      <div class="gallery-search"><label for="librarySearch">Search patterns</label><input id="librarySearch" type="search" class="text-input" placeholder="Search filenames, designers, categories, and attributes" disabled></div>
+      <div class="gallery-toolbar"><label>Category<select id="libraryCategoryFilter" class="text-input" disabled><option value="">All categories</option></select></label><div id="libraryAttributeFilter" class="gallery-attribute-filter"></div><label>Designer<select id="libraryDesignerFilter" class="text-input" disabled><option value="">All designers</option></select></label><label>Sort by<select id="librarySort" class="text-input" disabled><option value="name">File name</option><option value="designer">Designer</option><option value="recent">Last modified</option></select></label><button id="clearGalleryFiltersButton" class="secondary-button" type="button" disabled>Clear filters</button><div class="gallery-view-options" role="group" aria-label="Library view"><button id="galleryGridButton" class="secondary-button" type="button" aria-pressed="true" disabled>Gallery</button><button id="galleryListButton" class="secondary-button" type="button" aria-pressed="false" disabled>List</button></div></div>
+      <div class="library-selection-entry"><button id="librarySelectButton" class="secondary-button" type="button" aria-pressed="false" aria-controls="libraryBulkTools" disabled>Select patterns</button><p class="note">Filter by category, attributes, and designer to classify existing patterns together.</p></div>
+      <section id="libraryBulkTools" class="library-bulk-tools hidden" aria-label="Bulk category and attribute editing">
         <div class="library-selection-actions"><strong id="librarySelectionCount" role="status" aria-live="polite">0 selected</strong><button id="selectLibraryPageButton" class="secondary-button" type="button">Select this page</button><button id="selectLibraryResultsButton" class="secondary-button" type="button">Select all results</button><button id="clearLibrarySelectionButton" class="secondary-button" type="button">Clear selection</button></div>
-        <p class="note">Selection stays across pages. Changing search or filters clears it. Applying categories replaces the selected patterns’ existing categories.</p>
-        <div id="libraryBulkCategoryPicker"></div>
-        <button id="applyLibraryCategoriesButton" type="button" disabled>Apply categories</button>
+        <p class="note">Selection stays across pages. Changing search or filters clears it. Apply categories and attributes separately. Each action replaces only its own values.</p>
+        <div class="library-bulk-fields">
+          <div><div id="libraryBulkCategoryPicker"></div><button id="applyLibraryCategoriesButton" type="button" disabled>Apply categories</button></div>
+          <div><div id="libraryBulkAttributePicker"></div><div class="library-attribute-actions"><button id="applyLibraryAttributesButton" type="button" disabled>Apply attributes</button><button id="clearLibraryAttributesButton" class="secondary-button" type="button" disabled>Clear attributes</button></div><p class="note">Attribute changes leave categories unchanged.</p></div>
+        </div>
       </section>
       <p id="libraryBulkStatus" class="note" role="status" aria-live="polite"></p>
       <div class="library-pagination"><button id="libraryPreviousButton" class="secondary-button" type="button" disabled>Previous</button><span id="libraryPageSummary" role="status" aria-live="polite"></span><button id="libraryNextButton" class="secondary-button" type="button" disabled>Next</button><button id="clearThumbnailCacheButton" class="secondary-button cache-clear" type="button" disabled>Clear thumbnail cache</button></div>
@@ -121,24 +123,24 @@
     <section class="panel"><h2>Designer folders</h2><p class="note">Browse designers in the connected pattern folder.</p><input type="search" id="designerSearch" class="search-box" placeholder="Search designers" aria-label="Search designers" disabled><div id="designerFolderList" class="list"><p class="empty">Select a pattern folder first.</p></div></section>
   </main>
 
-  <script src="js/draft-store.js?v=20261016-roles" defer></script>
-  <script src="js/utils.js?v=20261016-roles" defer></script>
-  <script src="js/storage.js?v=20261016-roles" defer></script>
-  <script src="js/aliases.js?v=20261016-roles" defer></script>
-  <script src="js/logs.js?v=20261016-roles" defer></script>
-  <script src="js/organizer.js?v=20261016-roles" defer></script>
-  <script src="js/review.js?v=20261016-roles" defer></script>
-  <script src="js/library.js?v=20261016-roles" defer></script>
-  <script src="js/batch.js?v=20261016-roles" defer></script>
-  <script src="js/catalog-model.js?v=20261016-roles" defer></script>
-  <script src="js/gallery-model.js?v=20261016-roles" defer></script>
-  <script src="js/thumbnail-store.js?v=20261016-roles" defer></script>
-  <script src="js/pdf-preview.js?v=20261016-roles" defer></script>
-  <script src="js/gallery.js?v=20261016-roles" defer></script>
-  <script src="js/library-bulk.js?v=20261016-roles" defer></script>
-  <script src="js/catalog.js?v=20261016-roles" defer></script>
-  <script src="js/maintenance-model.js?v=20261016-roles" defer></script>
-  <script src="js/maintenance.js?v=20261016-roles" defer></script>
-  <script src="js/app.js?v=20261016-roles" defer></script>
+  <script src="js/draft-store.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/utils.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/storage.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/aliases.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/logs.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/organizer.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/review.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/library.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/batch.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/catalog-model.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/gallery-model.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/thumbnail-store.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/pdf-preview.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/gallery.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/library-bulk.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/catalog.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/maintenance-model.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/maintenance.js?v=20261016-gallery-cards" defer></script>
+  <script src="js/app.js?v=20261016-gallery-cards" defer></script>
 </body>
 </html>

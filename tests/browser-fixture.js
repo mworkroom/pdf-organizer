@@ -66,7 +66,7 @@
   async function seed(count) {
     await draftReady;
     await guard();
-    ReviewDraftStore.save = realSave; copyFileThenRemoveOriginal = realMove;writeCatalogText=realCatalogWrite;categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryPageDrafts.clear();
+    ReviewDraftStore.save = realSave; copyFileThenRemoveOriginal = realMove;writeCatalogText=realCatalogWrite;categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();
     const origin = await navigator.storage.getDirectory();
     const name = 'pdf-organizer-qa-' + Date.now();
     const root = await origin.getDirectoryHandle(name, {create:true}); fixtureRoots.push(name);
@@ -226,7 +226,7 @@
     fixtureRoots.length=0;localStorage.removeItem('pdfOrganizerQaRoots');resetBatchState();downloadDirectoryHandle=null;libraryDirectoryHandle=null;designerFolders=[];singlesPdfNames=[];
     designerAliases={};actionLogs=[];localStorage.removeItem(ALIAS_STORAGE_KEY);localStorage.removeItem(LOG_STORAGE_KEY);
     draftRevision=0;savedDraftRevision=0;pendingDraft=null;
-    libraryCatalog=null;catalogRoot=null;catalogDiskText=null;catalogError='';indexedLibraryFiles=[];categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryPageDrafts.clear();renderCatalogUI();
+    libraryCatalog=null;catalogRoot=null;catalogDiskText=null;catalogError='';indexedLibraryFiles=[];categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();renderCatalogUI();
     renderSortingRows();renderDownloadFileList();renderAliasList();renderActionLogs();
     draftSaveStatus.textContent='Select a folder to enable review autosave.';
   });
