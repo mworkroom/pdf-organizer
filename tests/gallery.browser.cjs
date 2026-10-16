@@ -70,16 +70,16 @@ async function main(){
       const entries=await read(),bytes=entries.reduce((sum,item)=>sum+item.blob.size,0);await ThumbnailStore.clear();return {smallCount,bytes};
     });assert.ok(limits.smallCount<=200);assert.ok(limits.bytes<=40*1024*1024);
     await button('Gallery').click();await button('Clear filters').click();await wait(()=>document.querySelectorAll('.library-pattern').length===24);await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill('Sweater');await wait(()=>document.querySelector('#libraryPageSummary').textContent.includes('33 results'));
-    for(const width of [2048,1280]){
+    for(const width of [2048,1600,1536,1280]){
       await page.setViewportSize({width,height:1152});await page.locator('.gallery-panel').scrollIntoViewIfNeeded();await wait(()=>[...document.querySelectorAll('.library-pattern')].filter(card=>card.getBoundingClientRect().top<innerHeight+100&&card.getBoundingClientRect().bottom>-100).every(card=>card.dataset.preview!=='pending'));
       const layout=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,inputSize:parseFloat(getComputedStyle(document.querySelector('#librarySearch')).fontSize),titleSize:parseFloat(getComputedStyle(document.querySelector('.pattern-title')).fontSize),overlaps:[...document.querySelectorAll('.gallery-toolbar button,.gallery-toolbar select')].some(element=>element.getBoundingClientRect().right>innerWidth)}));
       const geometry=await page.evaluate(()=>{
         const cards=[...document.querySelectorAll('.library-pattern')],top=cards[0].getBoundingClientRect().top,thumb=cards[0].querySelector('.pattern-thumbnail').getBoundingClientRect(),edit=cards[0].querySelector('.pattern-edit-button').getBoundingClientRect();
         return {columns:cards.filter(card=>Math.abs(card.getBoundingClientRect().top-top)<2).length,ratio:thumb.height/thumb.width,fit:getComputedStyle(cards[0].querySelector('img')).objectFit,editInside:edit.right<=thumb.right&&edit.bottom<=thumb.bottom&&thumb.right-edit.right<12&&thumb.bottom-edit.bottom<12,hiddenInfo:document.querySelectorAll('.pattern-card-header .pattern-path,.pattern-card-header .pattern-page-caption').length};
       });
-      assert.equal(geometry.columns,width===2048?7:4);assert.ok(Math.abs(geometry.ratio-Math.SQRT2)<0.02);assert.equal(geometry.fit,'cover');assert.equal(geometry.editInside,true);assert.equal(geometry.hiddenInfo,0);
+      assert.equal(geometry.columns,width>=1600?7:width===1536?6:5);assert.ok(Math.abs(geometry.ratio-Math.SQRT2)<0.02);assert.equal(geometry.fit,'cover');assert.equal(geometry.editInside,true);assert.equal(geometry.hiddenInfo,0);
       assert.equal(layout.width,layout.scroll);assert.ok(layout.inputSize>=16&&layout.titleSize>=16);assert.equal(layout.overlaps,false);
-      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-compact-gallery-${width}.png`)});
+      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-window-gallery-${width}.png`)});
     }
     // Add real OPFS files for long-name wrapping and landscape cropping checks.
     await page.evaluate(async()=>{
@@ -93,7 +93,7 @@ async function main(){
     await search('Landscape_Sweater');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready');
     const landscape=await page.locator('.pattern-thumbnail img').evaluate(img=>({wide:img.naturalWidth>img.naturalHeight,fit:getComputedStyle(img).objectFit}));assert.equal(landscape.wide,true);assert.equal(landscape.fit,'cover');
     await search('Unbound');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready');
-    for(const width of [2048,1760,1280,390]){
+    for(const width of [2048,1760,1600,1536,1280,390]){
       await page.setViewportSize({width,height:width===390?844:1152});
       const wrapped=await page.locator('.library-pattern').evaluate(card=>{
         const title=card.querySelector('.pattern-title'),header=card.querySelector('.pattern-card-header'),edit=card.querySelector('.pattern-edit-button'),thumb=card.querySelector('.pattern-thumbnail');
@@ -107,14 +107,14 @@ async function main(){
     await page.evaluate(()=>libraryDirectoryHandle.removeEntry('Broken.pdf'));
     await button('Clear filters').click();await button('Refresh library').click();await wait(()=>libraryCatalog?.patterns.filter(p=>p.present).length===132);
     // Show the seven-column result from the top of the panel, with long-name and landscape samples included.
-    for(const width of [2048,1280]){
+    for(const width of [2048,1600,1536,1280]){
       await page.setViewportSize({width,height:1152});await page.locator('.gallery-panel').evaluate(el=>window.scrollTo(0,el.getBoundingClientRect().top+scrollY-16));
       await wait(()=>[...document.querySelectorAll('.library-pattern')].filter(card=>card.getBoundingClientRect().top<innerHeight+100&&card.getBoundingClientRect().bottom>-100).every(card=>card.dataset.preview!=='pending'));
-      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-compact-gallery-${width}.png`)});
+      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-window-gallery-${width}.png`)});
     }
     assert.deepEqual(errors,[]);assert.ok(requests.every(url=>url.startsWith('http://127.0.0.1:8766/')||url.startsWith('blob:http://127.0.0.1:8766/')));
     await button('End sample session').click();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===0);
-    console.log(JSON.stringify({result:'PASS',pdfs:131,pageSize:24,workerConcurrency:1,cache:limits,viewports:[2048,1760,1280,390],additionalLayoutSamples:2,unexpectedErrors:errors.length,externalRequests:0}));
+    console.log(JSON.stringify({result:'PASS',pdfs:131,pageSize:24,workerConcurrency:1,cache:limits,viewports:[2048,1760,1600,1536,1280,390],additionalLayoutSamples:2,unexpectedErrors:errors.length,externalRequests:0}));
   }finally{await context.close();await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

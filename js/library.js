@@ -17,7 +17,8 @@ function setActiveView(view) {
     tab.setAttribute("aria-pressed", String(active));
   }
   scheduleDraftSave();
-  if(view==='library')renderLibraryPatterns();else GalleryPreviews.suspend();
+  if(view==='library'){ReviewPreviews.suspend();renderLibraryPatterns();}
+  else{GalleryPreviews.suspend();ReviewPreviews.resume();}
 }
 
 function openReviewPdf(file) {

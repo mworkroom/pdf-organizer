@@ -201,6 +201,7 @@ async function restoreReviewDraft() {
 
 function setOperationBusy(busy) {
   operationBusy = busy;
+  if(busy&&typeof ReviewPreviews!=='undefined')ReviewPreviews.suspend();
   const controls = document.querySelectorAll("button, input, select, textarea");
   for (const control of controls) {
     if (control === cancelDuplicateCheckButton || control.classList.contains("nav-tab") || control.id === "pauseAnalysisButton") continue;
@@ -222,5 +223,6 @@ function setOperationBusy(busy) {
     updateBatchControls();
     renderCatalogControls();
     GalleryPreviews.resume();
+    if(typeof ReviewPreviews!=='undefined')ReviewPreviews.resume();
   }
 }

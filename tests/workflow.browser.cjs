@@ -49,7 +49,7 @@ async function main(){
     for(const width of [2048,1280]){
       await page.setViewportSize({width,height:1152});await row(0).scrollIntoViewIfNeeded();
       const layout=await row(0).evaluate(element=>{
-        const naming=element.querySelector('.sort-grid').getBoundingClientRect(),categories=element.querySelector('.review-categories').getBoundingClientRect();
+        const naming=element.querySelector('.review-naming').getBoundingClientRect(),categories=element.querySelector('.review-categories').getBoundingClientRect();
         return {width:innerWidth,scroll:document.documentElement.scrollWidth,height:element.getBoundingClientRect().height,viewportHeight:innerHeight,ratio:naming.width/(naming.width+categories.width),categoryLeft:categories.left,namingRight:naming.right,topDifference:Math.abs(naming.top-categories.top),categoryCount:element.querySelectorAll('.review-categories .category-picker:not(.attribute-picker) input').length,fields:[...element.querySelectorAll('.text-input')].map(input=>({size:parseFloat(getComputedStyle(input).fontSize),left:input.getBoundingClientRect().left,right:input.getBoundingClientRect().right})),cards:document.querySelectorAll('#sortingList .sort-row').length};
       });
       assert.equal(layout.width,layout.scroll);assert.equal(layout.cards,100);assert.ok(layout.fields.every(field=>field.size>=16&&field.left>=0&&field.right<=width));

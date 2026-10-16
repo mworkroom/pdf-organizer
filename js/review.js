@@ -104,6 +104,7 @@ function renderSortingRows() {
   updateBatchControls();
 }
 function renderReviewCards() {
+  ReviewPreviews.reset();
   sortingList.innerHTML = "";
 
   for (const file of downloadFiles) {
@@ -278,9 +279,18 @@ function renderReviewCards() {
     grid.appendChild(previewField);
 
     row.appendChild(sourceHeader);
-    body.append(grid, renderReviewCategories(file));
+    const categories=renderReviewCategories(file);
+    const naming=document.createElement('div');naming.className='review-naming';
+    const cover=document.createElement('figure');cover.className='review-cover';cover.dataset.preview='pending';
+    const coverOpen=document.createElement('button');coverOpen.type='button';coverOpen.className='review-cover-open';coverOpen.dataset.reviewPreviewControl='';coverOpen.setAttribute('aria-label',`Open PDF cover for ${file.name}`);coverOpen.title='Open PDF';coverOpen.onclick=()=>openReviewPdf(file);
+    const image=document.createElement('img');image.hidden=true;image.alt=`${file.name}, first page`;image.decoding='async';
+    const placeholder=document.createElement('span');placeholder.className='review-cover-placeholder';placeholder.textContent='Preview pending';coverOpen.append(image,placeholder);
+    const caption=document.createElement('figcaption');caption.className='note';caption.textContent='First page';
+    const retry=document.createElement('button');retry.type='button';retry.className='secondary-button';retry.dataset.reviewPreviewControl='';retry.textContent='Retry cover';retry.hidden=true;
+    cover.append(coverOpen,caption,retry);naming.append(cover,grid);body.append(naming,categories);
     row.appendChild(body);
     sortingList.appendChild(row);
+    ReviewPreviews.observe(file,cover,image,placeholder,caption,retry);
 
     excludeCheckbox.addEventListener("change", () => {
       file.excluded = excludeCheckbox.checked;
@@ -288,7 +298,7 @@ function renderReviewCards() {
       invalidateDuplicateCheck();
       row.classList.toggle('excluded', file.excluded);
       row.querySelectorAll('input, button').forEach(control => {
-        if (control !== excludeCheckbox && control !== openButton) control.disabled = file.excluded;
+        if (control !== excludeCheckbox && control !== openButton && !control.hasAttribute('data-review-preview-control')) control.disabled = file.excluded;
       });
       rememberButton.disabled = file.excluded || !getExistingFolderName(file);
     });
