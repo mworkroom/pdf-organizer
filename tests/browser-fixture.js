@@ -66,7 +66,7 @@
   async function seed(count) {
     await draftReady;
     await guard();
-    ReviewDraftStore.save = realSave; copyFileThenRemoveOriginal = realMove;writeCatalogText=realCatalogWrite;categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();
+    ReviewDraftStore.save = realSave; copyFileThenRemoveOriginal = realMove;writeCatalogText=realCatalogWrite;categoryEditorDirty=false;attributeEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();
     const origin = await navigator.storage.getDirectory();
     const name = 'pdf-organizer-qa-' + Date.now();
     const root = await origin.getDirectoryHandle(name, {create:true}); fixtureRoots.push(name);
@@ -109,6 +109,9 @@
   }
   document.getElementById('qaSeed400').onclick = wrap(()=>seed(400));
   document.getElementById('qaSeed200').onclick = wrap(()=>seed(200));
+  const smallCount=document.createElement('input');smallCount.id='qaSampleCount';smallCount.type='number';smallCount.min='0';smallCount.max='400';smallCount.value='1';smallCount.setAttribute('aria-label','QA sample count');panel.insertBefore(smallCount,report);
+  const smallSeed=document.createElement('button');smallSeed.id='qaCustomSeed';smallSeed.textContent='Prepare custom samples';smallSeed.onclick=wrap(()=>{const count=Number(smallCount.value);if(!Number.isInteger(count)||count<0||count>400)throw new Error('Invalid sample count');return seed(count);});panel.insertBefore(smallSeed,report);
+
   categorySeed.onclick=wrap(async()=>{
     await seed(200);
     const put=async(dir,name)=>{const handle=await dir.getFileHandle(name,{create:true});const writable=await handle.createWritable();await writable.write(samplePdf(888));await writable.close();};
@@ -226,7 +229,7 @@
     fixtureRoots.length=0;localStorage.removeItem('pdfOrganizerQaRoots');resetBatchState();downloadDirectoryHandle=null;libraryDirectoryHandle=null;designerFolders=[];singlesPdfNames=[];
     designerAliases={};actionLogs=[];localStorage.removeItem(ALIAS_STORAGE_KEY);localStorage.removeItem(LOG_STORAGE_KEY);
     draftRevision=0;savedDraftRevision=0;pendingDraft=null;
-    libraryCatalog=null;catalogRoot=null;catalogDiskText=null;catalogError='';indexedLibraryFiles=[];categoryEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();renderCatalogUI();
+    libraryCatalog=null;reviewAttributes=null;catalogRoot=null;catalogDiskText=null;catalogError='';indexedLibraryFiles=[];categoryEditorDirty=false;attributeEditorDirty=false;libraryCategoryDrafts.clear();libraryAttributeDrafts.clear();libraryPageDrafts.clear();renderCatalogUI();
     renderSortingRows();renderDownloadFileList();renderAliasList();renderActionLogs();
     draftSaveStatus.textContent='Select a folder to enable review autosave.';
   });

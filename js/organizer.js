@@ -755,7 +755,7 @@ async function copyFileThenRemoveOriginal(plan) {
   }
 }
 
-async function reloadDownloadData() {
+async function reloadDownloadData({startBatch=false}={}) {
   const previousFiles = new Map(getAllReviewFiles().filter(file => !file.completed).map(file => [file.name, file]));
   const currentNames = downloadFiles.filter(file => !file.completed).map(file => file.name);
   const queuedNames = queuedDownloadFiles.map(file => file.name);
@@ -790,6 +790,10 @@ async function reloadDownloadData() {
     queuedDownloadFiles = take(queuedNames);
     deferredDownloadFiles = take(deferredNames);
     queuedDownloadFiles.push(...byName.values());
+    if(startBatch&&!downloadFiles.length&&queuedDownloadFiles.length){
+      downloadFiles=queuedDownloadFiles.splice(0,BATCH_LIMIT);
+      batchNumber++;
+    }
   }
   if (!downloadFiles.some(file => file.name === selectedReviewName)) selectedReviewName = downloadFiles[0]?.name || "";
   reviewSelections = new Set([...reviewSelections].filter(name => downloadFiles.some(file => file.name === name)));

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
 
-  <link rel="stylesheet" href="css/style.css?v=20261016-review-covers">
+  <link rel="stylesheet" href="css/style.css?v=20261018-editable-attributes">
 </head>
 
 <body>
@@ -77,7 +77,7 @@
         <button id="executeButton" class="execute-button">Organize batch</button>
         <div id="executeStatus" class="execute-status" role="status" aria-live="polite"></div>
       </div>
-      <p class="note review-intro">Review each file below, then check duplicates and organize this batch. Changes are saved automatically.</p>
+      <p class="note review-intro">Review 1–100 files at a time, then check duplicates and organize this batch. Changes are saved automatically.</p>
       <section id="sortingList" class="review-cards" aria-label="Files to review"></section>
     </section>
 
@@ -100,6 +100,7 @@
 
   <main id="libraryView" class="hidden">
     <section class="panel"><details id="categoryManager"><summary class="section-summary">Manage categories</summary><p class="note">Edit category names, order, and filename keywords, then save. Other covers types outside the list; Unknown means unclassified. These two categories cannot be deleted.</p><div class="category-manager-actions"><button id="saveCategoriesButton" type="button" data-catalog-control>Save category changes</button><input id="newCategoryName" class="text-input" aria-label="New category name" placeholder="New category name" data-catalog-control><button id="addCategoryButton" class="secondary-button" type="button" data-catalog-control>Add category</button><button id="reanalyzeLibraryButton" class="secondary-button" type="button" data-catalog-control>Reanalyze automatic categories</button></div><div class="category-manager-heading"><span>Name</span><span>Keywords, separated by commas</span><span>Order / replacement on deletion</span></div><div id="categoryManagerList"></div></details></section>
+    <section class="panel"><details id="attributeManager"><summary class="section-summary">Manage attributes</summary><p class="note">Add attributes, edit their names and order, then save. Renaming keeps existing assignments. On deletion, choose a replacement or clear assignments.</p><div class="attribute-manager-actions"><button id="saveAttributesButton" type="button" data-catalog-control>Save attribute changes</button><button id="cancelAttributeEditsButton" class="secondary-button" type="button" data-catalog-control>Cancel attribute edits</button><input id="newAttributeName" class="text-input" aria-label="New attribute name" placeholder="New attribute name" data-catalog-control><button id="addAttributeButton" class="secondary-button" type="button" data-catalog-control>Add attribute</button></div><div id="attributeManagerList"></div></details></section>
     <section class="panel"><details id="libraryMaintenance"><summary class="section-summary">PDF text analysis and relinking</summary><div id="maintenanceContent"></div></details></section>
     <section class="panel gallery-panel">
       <div class="panel-header"><div><h2>Pattern Library</h2><p id="catalogStatus" class="note" role="status" aria-live="polite">Connect a pattern folder.</p></div><button id="refreshLibraryButton" class="secondary-button" type="button" disabled>Refresh library</button></div>
@@ -123,25 +124,26 @@
     <section class="panel"><h2>Designer folders</h2><p class="note">Browse designers in the connected pattern folder.</p><input type="search" id="designerSearch" class="search-box" placeholder="Search designers" aria-label="Search designers" disabled><div id="designerFolderList" class="list"><p class="empty">Select a pattern folder first.</p></div></section>
   </main>
 
-  <script src="js/draft-store.js?v=20261016-review-covers" defer></script>
-  <script src="js/utils.js?v=20261016-review-covers" defer></script>
-  <script src="js/storage.js?v=20261016-review-covers" defer></script>
-  <script src="js/aliases.js?v=20261016-review-covers" defer></script>
-  <script src="js/logs.js?v=20261016-review-covers" defer></script>
-  <script src="js/organizer.js?v=20261016-review-covers" defer></script>
-  <script src="js/review.js?v=20261016-review-covers" defer></script>
-  <script src="js/library.js?v=20261016-review-covers" defer></script>
-  <script src="js/batch.js?v=20261016-review-covers" defer></script>
-  <script src="js/catalog-model.js?v=20261016-review-covers" defer></script>
-  <script src="js/gallery-model.js?v=20261016-review-covers" defer></script>
-  <script src="js/thumbnail-store.js?v=20261016-review-covers" defer></script>
-  <script src="js/pdf-preview.js?v=20261016-review-covers" defer></script>
-  <script src="js/review-previews.js?v=20261016-review-covers" defer></script>
-  <script src="js/gallery.js?v=20261016-review-covers" defer></script>
-  <script src="js/library-bulk.js?v=20261016-review-covers" defer></script>
-  <script src="js/catalog.js?v=20261016-review-covers" defer></script>
-  <script src="js/maintenance-model.js?v=20261016-review-covers" defer></script>
-  <script src="js/maintenance.js?v=20261016-review-covers" defer></script>
-  <script src="js/app.js?v=20261016-review-covers" defer></script>
+  <script src="js/draft-store.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/utils.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/storage.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/aliases.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/logs.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/organizer.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/review.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/library.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/batch.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/catalog-model.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/gallery-model.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/thumbnail-store.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/pdf-preview.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/review-previews.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/gallery.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/library-bulk.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/catalog.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/attribute-manager.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/maintenance-model.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/maintenance.js?v=20261018-editable-attributes" defer></script>
+  <script src="js/app.js?v=20261018-editable-attributes" defer></script>
 </body>
 </html>

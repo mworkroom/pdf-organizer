@@ -26,10 +26,11 @@ function normalizeReviewDraft(draft) {
   if (!draft || ![1, 2].includes(draft.version) || !Array.isArray(draft.files)) {
     throw new Error("Unsupported review format. Saved data will not be overwritten.");
   }
+  if(draft.attributes!==undefined)CatalogModel.validateAttributes(draft.attributes);
   const names = new Set();
   const files = draft.files.map((file, index) => {
     if (typeof file.name !== "string" || names.has(file.name)) throw new Error("The file list in the saved review is invalid.");
-    if(file.attributeIds!==undefined&&(!Array.isArray(file.attributeIds)||CatalogModel.attributeIds(file.attributeIds).length!==file.attributeIds.length))throw new Error('The attributes in the saved review are invalid. Saved data will not be overwritten.');
+    if(file.attributeIds!==undefined&&(!Array.isArray(file.attributeIds)||CatalogModel.attributeIds(file.attributeIds,draft.attributes).length!==file.attributeIds.length))throw new Error('The attributes in the saved review are invalid. Saved data will not be overwritten.');
     names.add(file.name);
     const role = draft.version === 1 ? (index < BATCH_LIMIT ? "current" : "queued") : file.role;
     if (!["current", "queued", "deferred"].includes(role)) throw new Error("The batch information in the saved review is invalid.");
@@ -73,7 +74,7 @@ async function startNextBatch(fromDeferred = false) {
   setOperationBusy(true);
   try {
     await saveReviewDraft();
-    await reloadDownloadData();
+    await reloadDownloadData({startBatch:false});
     const source = fromDeferred ? deferredDownloadFiles : queuedDownloadFiles;
     if (!source.length) return;
     downloadFiles = source.splice(0, BATCH_LIMIT);
@@ -138,6 +139,7 @@ function updateBatchControls() {
   document.getElementById("batchTitle").textContent = `Batch ${batchNumber}`;
   document.getElementById("batchSummary").textContent = `Current: ${downloadFiles.length} · Queued: ${queuedDownloadFiles.length} · Deferred/excluded: ${deferredDownloadFiles.length}`;
   if (!operationBusy) {
+    document.getElementById("nextBatchButton").textContent = queuedDownloadFiles.length?`Review next ${Math.min(BATCH_LIMIT,queuedDownloadFiles.length)}`:'No queued files';
     document.getElementById("nextBatchButton").disabled = Boolean(downloadFiles.length) || !queuedDownloadFiles.length;
     document.getElementById("deferBatchButton").disabled = !downloadFiles.length;
     document.getElementById("reviewDeferredButton").disabled = Boolean(downloadFiles.length) || !deferredDownloadFiles.length;

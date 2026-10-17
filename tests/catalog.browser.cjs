@@ -31,7 +31,7 @@ async function main(){
     const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater'});
     await root().getByRole('button',{name:'Edit',exact:true}).click();
     await root().getByRole('checkbox',{name:'Hat',exact:true}).check();await root().getByRole('checkbox',{name:'Scarf',exact:true}).check();
-    await ui('Save categories').click();await idle();
+    await ui('Save changes').click();await idle();
     const rootId=(await report()).catalog.patterns.find(p=>p.path==='Root_Sweater.pdf').id;
     await page.locator('#categoryManager > summary').click();
     await page.getByRole('textbox',{name:'Sweater Name',exact:true}).fill('Pullovers');await ui('Sweater Move down').click();await ui('Save category changes').click();await idle();

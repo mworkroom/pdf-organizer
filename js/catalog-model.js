@@ -12,9 +12,20 @@ const CatalogModel = (() => {
   ];
   const idFor = name => name.toLowerCase().replaceAll(' ', '-');
   const attributes=Object.freeze(['stockinette','stranded','texture']);
-  const attributeIds=ids=>attributes.filter(id=>Array.isArray(ids)&&ids.includes(id));
+  const defaultAttributes=attributes.map(id=>({id,name:id}));
+  const attributeDefinitions=catalog=>catalog?.attributes??defaultAttributes;
+  function validateAttributes(items){
+    if(!Array.isArray(items))throw new Error('Invalid attributes list.');
+    const ids=new Set(),names=new Set();
+    for(const item of items){
+      if(!item||typeof item.id!=='string'||!item.id||ids.has(item.id)||typeof item.name!=='string'||!item.name.trim()||names.has(item.name.trim().toLowerCase()))throw new Error('Attribute names and IDs must be nonempty and unique.');
+      ids.add(item.id);names.add(item.name.trim().toLowerCase());
+    }
+    return items;
+  }
+  const attributeIds=(ids,definitions=defaultAttributes)=>definitions.filter(item=>Array.isArray(ids)&&ids.includes(item.id)).map(item=>item.id);
   const hasManualClassification=pattern=>pattern.categorySource==='manual'||Boolean(pattern.attributeIds?.length);
-  const create = () => ({version:1, revision:0, libraryId:crypto.randomUUID(), categories:definitions.map(([name, words])=>({id:idFor(name),name,keywords:words?words.split(','):[]})), patterns:[]});
+  const create = () => ({version:1, revision:0, libraryId:crypto.randomUUID(), attributes:structuredClone(defaultAttributes), categories:definitions.map(([name, words])=>({id:idFor(name),name,keywords:words?words.split(','):[]})), patterns:[]});
   function categoryIds(ids, categories) {
     const known=new Set(categories.map(c=>c.id));
     const result=[...new Set((Array.isArray(ids)?ids:[]).filter(id=>known.has(id)))];
@@ -33,6 +44,9 @@ const CatalogModel = (() => {
   function validate(value) {
     const fail=()=>{throw new Error('Invalid metadata format or unsupported version. The original JSON will not be overwritten.');};
     if(!value||value.version!==1||!Number.isSafeInteger(value.revision)||value.revision<0||typeof value.libraryId!=='string'||!value.libraryId||!Array.isArray(value.categories)||!Array.isArray(value.patterns))fail();
+    let definitions;
+    try{definitions=validateAttributes(value.attributes===undefined?defaultAttributes:value.attributes);}catch{fail();}
+    const knownAttributes=new Set(definitions.map(item=>item.id));
     const ids=new Set(), names=new Set(), patterns=new Set(), livePaths=new Set();
     for(const c of value.categories){
       if(!c||typeof c.id!=='string'||!c.id||ids.has(c.id)||typeof c.name!=='string'||!c.name.trim()||names.has(c.name.trim().toLowerCase())||!Array.isArray(c.keywords)||c.keywords.some(k=>typeof k!=='string'||!k.trim()))fail();
@@ -43,7 +57,7 @@ const CatalogModel = (() => {
       if(!p||typeof p.id!=='string'||!p.id||patterns.has(p.id)||typeof p.path!=='string'||!p.path||p.path.startsWith('/')||p.path.split('/').some(s=>!s||s==='.'||s==='..')||!Number.isFinite(p.size)||p.size<0||!Number.isFinite(p.lastModified)||typeof p.present!=='boolean'||!Array.isArray(p.categoryIds)||!p.categoryIds.length||p.categoryIds.some(id=>!ids.has(id))||new Set(p.categoryIds).size!==p.categoryIds.length|| (p.categoryIds.includes('unknown')&&p.categoryIds.length>1)||!['manual','filename','pdf-text'].includes(p.categorySource))fail();
       if(p.present&&livePaths.has(p.path))fail();
       if(p.representativePage!==undefined&&(!Number.isSafeInteger(p.representativePage)||p.representativePage<1))fail();
-      if(p.attributeIds!==undefined&&(!Array.isArray(p.attributeIds)||p.attributeIds.some(id=>!attributes.includes(id))||new Set(p.attributeIds).size!==p.attributeIds.length))fail();
+      if(p.attributeIds!==undefined&&(!Array.isArray(p.attributeIds)||p.attributeIds.some(id=>!knownAttributes.has(id))||new Set(p.attributeIds).size!==p.attributeIds.length))fail();
       if(p.designerName!==undefined&&typeof p.designerName!=='string')fail();
       if(p.sha256!==undefined&&!/^[a-f0-9]{64}$/.test(p.sha256))fail();
       if(p.mergedInto!==undefined&&(typeof p.mergedInto!=='string'||!p.mergedInto||p.mergedInto===p.id||p.present))fail();
@@ -93,12 +107,19 @@ const CatalogModel = (() => {
   function replaceAttributes(catalog, patternIds, replacementIds) {
     const targets=new Set(patternIds);
     if(!targets.size)throw new Error('Select patterns first.');
-    if(!Array.isArray(replacementIds)||replacementIds.some(id=>!attributes.includes(id)))throw new Error('Choose valid replacement attributes.');
+    if(!Array.isArray(replacementIds)||replacementIds.some(id=>!attributeDefinitions(catalog).some(item=>item.id===id)))throw new Error('Choose valid replacement attributes.');
     const present=new Set(catalog.patterns.filter(pattern=>pattern.present).map(pattern=>pattern.id));
     if([...targets].some(id=>!present.has(id)))throw new Error('Selected patterns have changed. Refresh the library and select them again.');
-    const next=structuredClone(catalog),ids=attributeIds(replacementIds);
+    const next=structuredClone(catalog),ids=attributeIds(replacementIds,attributeDefinitions(catalog));
     for(const pattern of next.patterns)if(targets.has(pattern.id))pattern.attributeIds=[...ids];
     return validate(next);
   }
-  return {create,validate,infer,categoryIds,reconcile,removeCategory,replaceCategories,attributes,attributeIds,replaceAttributes,hasManualClassification};
+  function removeAttribute(catalog,id,replacement=''){
+    const definitions=attributeDefinitions(catalog);
+    if(!definitions.some(item=>item.id===id)||replacement===id||(replacement&&!definitions.some(item=>item.id===replacement)))throw new Error('Choose a valid replacement attribute.');
+    catalog.attributes=definitions.filter(item=>item.id!==id).map(item=>({...item}));
+    for(const pattern of catalog.patterns)if(pattern.attributeIds?.includes(id))pattern.attributeIds=attributeIds(pattern.attributeIds.flatMap(value=>value===id?(replacement?[replacement]:[]):[value]),catalog.attributes);
+    return validate(catalog);
+  }
+  return {create,validate,infer,categoryIds,reconcile,removeCategory,replaceCategories,attributes,attributeDefinitions,validateAttributes,attributeIds,replaceAttributes,removeAttribute,hasManualClassification};
 })();

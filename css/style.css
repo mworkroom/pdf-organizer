@@ -864,3 +864,14 @@
   .review-cards .source-file { flex-basis: 100%; }
   .library-bulk-tools { padding: 14px; }
 }
+
+/* Attribute dictionaries and filter modes wrap without reducing readable text. */
+.attribute-manager-actions, .attribute-row-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.attribute-manager-actions { margin: 16px 0; }
+.attribute-manager-actions input { width: 240px; }
+.attribute-manager-actions .secondary-button, .attribute-row-tools .secondary-button { margin: 0; }
+.attribute-editor { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(380px, 2fr); gap: 14px; padding: 12px 0; border-top: 1px solid #eee; align-items: center; }
+.attribute-row-tools select { flex: 1 1 220px; width: 220px; }
+.attribute-mode-label { display: grid; gap: 6px; font-size: 15px; margin-bottom: 8px; }
+.gallery-attribute-filter fieldset[hidden] { display: none; }
+@media (max-width: 800px) { .attribute-editor { grid-template-columns: minmax(0, 1fr); } }

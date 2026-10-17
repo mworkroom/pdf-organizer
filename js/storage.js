@@ -19,6 +19,7 @@ async function initializeDraft() {
     }
     pendingDraft = await ReviewDraftStore.load();
     if (pendingDraft) pendingDraft = normalizeReviewDraft(pendingDraft);
+    if(pendingDraft?.attributes)reviewAttributes=structuredClone(pendingDraft.attributes);
     if (pendingDraft?.files.length) {
       document.getElementById("draftRecoverySummary").textContent =
         `${pendingDraft.downloadDirectory.name} · Saved reviews: ${pendingDraft.files.length}`;
@@ -53,6 +54,7 @@ async function saveReviewDraft() {
     downloadDirectory: downloadDirectoryHandle,
     libraryDirectory: libraryDirectoryHandle,
     batchNumber, selectedReviewName, selections: [...reviewSelections], view: activeView,
+    attributes: structuredClone(availableAttributes()),
     files: serializeBatchFiles()
   };
   const task = draftSaveChain.then(async () => {
@@ -101,12 +103,12 @@ function captureFolderReview() {
     designerFolders: [...designerFolders], singlesPdfNames: [...singlesPdfNames], designerAliases: { ...designerAliases },
     fields: getAllReviewFiles().map(file => [file, Object.fromEntries(REVIEW_FIELDS.map(key => [key, file[key]]))]),
     labels: [downloadFolderName, libraryFolderName, designerFolderCount, singlesFileCount].map(element => element.textContent),
-    catalog: {libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage}
+    catalog: {libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage,reviewAttributes}
   };
 }
 
 function restoreFolderReview(previous) {
-  ({libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage}=previous.catalog);
+  ({libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage,reviewAttributes}=previous.catalog);
   ({ downloadDirectoryHandle, libraryDirectoryHandle, singlesDirectoryHandle, pendingDraft,
     downloadFiles, queuedDownloadFiles, deferredDownloadFiles, selectedReviewName, reviewSelections,
     batchNumber, batchInitialized, designerFolders, singlesPdfNames, designerAliases } = previous);
@@ -127,7 +129,7 @@ async function restoreReviewDraft() {
   const previous = { downloadDirectoryHandle, libraryDirectoryHandle, downloadFiles,
     designerFolders, singlesPdfNames, singlesDirectoryHandle, designerAliases,
     queuedDownloadFiles, deferredDownloadFiles, selectedReviewName, reviewSelections, batchNumber, batchInitialized,
-    catalog: {libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage} };
+    catalog: {libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage,reviewAttributes} };
   let loaded = false;
   let restored = 0, changed = 0;
   try {
@@ -174,7 +176,7 @@ async function restoreReviewDraft() {
     await saveReviewDraft();
   } catch (error) {
     if (!loaded) {
-      ({libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage}=previous.catalog);
+      ({libraryCatalog,catalogRoot,catalogDiskText,catalogError,indexedLibraryFiles,libraryPage,reviewAttributes}=previous.catalog);
       downloadDirectoryHandle = previous.downloadDirectoryHandle;
       libraryDirectoryHandle = previous.libraryDirectoryHandle;
       downloadFiles = previous.downloadFiles;

@@ -9,11 +9,12 @@ const GalleryModel = (() => {
     if(parts[0].startsWith('!'))return pattern.designerName||'';
     return parts[0];
   }
-  function select(catalog,{query='',category='',attributes=[],designerName='',sort='name'}={}){
+  function select(catalog,{query='',category='',attributes=[],attributeMode='selected',designerName='',sort='name'}={}){
     if(!catalog)return [];
     const terms=normalize(query).split(' ').filter(Boolean);
     const names=new Map(catalog.categories.map(c=>[c.id,c.name]));
-    const patterns=catalog.patterns.filter(p=>p.present&&(!category||p.categoryIds.includes(category))&&attributes.every(id=>(p.attributeIds||[]).includes(id))&&(!designerName||designer(p)===designerName)&&terms.every(term=>normalize([p.path,designer(p),...p.categoryIds.map(id=>names.get(id)),...(p.attributeIds||[])].join(' ')).includes(term)));
+    const attributeLabels=new Map((catalog.attributes||[]).map(item=>[item.id,item.name]));
+    const patterns=catalog.patterns.filter(p=>p.present&&(!category||p.categoryIds.includes(category))&&(attributeMode==='none'?!(p.attributeIds||[]).length:attributeMode==='any'||attributes.every(id=>(p.attributeIds||[]).includes(id)))&&(!designerName||designer(p)===designerName)&&terms.every(term=>normalize([p.path,designer(p),...p.categoryIds.map(id=>names.get(id)),...(p.attributeIds||[]).map(id=>attributeLabels.get(id)||id)].join(' ')).includes(term)));
     const titles=new Map(patterns.map(p=>[p.id,p.path.slice(p.path.lastIndexOf('/')+1)]));
     const designers=sort==='designer'?new Map(patterns.map(p=>[p.id,designer(p)])):null;
     return patterns.sort((a,b)=>{

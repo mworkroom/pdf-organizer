@@ -151,7 +151,7 @@ selectDownloadFolderButton.addEventListener("click", async () => {
 
     downloadFolderName.textContent = `Selected folder: ${downloadDirectoryHandle.name}`;
 
-    await reloadDownloadData();
+    await reloadDownloadData({startBatch:true});
     executeStatus.className = 'execute-status';
     executeStatus.textContent = '';
     scheduleDraftSave();

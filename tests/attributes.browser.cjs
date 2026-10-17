@@ -49,17 +49,16 @@ async function main(){
     await button('Pattern Library').click();await search('Pattern_000');
     const card=()=>page.locator('.library-pattern').first();await card().getByRole('button',{name:'Edit',exact:true}).click();
     await attributes(card()).getByRole('checkbox',{name:'stockinette',exact:true}).check();
-    await button('Save categories').click();await idle();
     assert.equal(await attributes(card()).getByRole('checkbox',{name:'stockinette',exact:true}).isChecked(),true);
     assert.deepEqual((await saved()).patterns.find(p=>p.id===incomingId).attributeIds,['stranded','texture']);
     await button('Refresh library').click();await idle();assert.match(await page.locator('#catalogStatus').innerText(),/Save or cancel.*attribute/);
     await search('no such file');await search('Pattern_000');
     assert.equal(await attributes(card()).getByRole('checkbox',{name:'stockinette',exact:true}).isChecked(),true);
-    await button('Save attributes').click();await idle();
+    await button('Save changes').click();await idle();
     assert.deepEqual((await saved()).patterns.find(p=>p.id===incomingId).attributeIds,['stockinette','stranded','texture']);
     await card().getByRole('button',{name:'Edit',exact:true}).click();
     for(const name of ['stockinette','stranded','texture'])await attributes(card()).getByRole('checkbox',{name,exact:true}).uncheck();
-    await button('Save attributes').click();await idle();
+    await button('Save changes').click();await idle();
     const cleared=(await saved()).patterns.find(p=>p.id===incomingId);assert.deepEqual(cleared.attributeIds,[]);assert.deepEqual(cleared.categoryIds,['cardigan']);
     await button('End sample session').click();await button('Prepare 131 gallery samples').click();await wait(()=>libraryCatalog?.patterns.filter(p=>p.present).length===131);
     // 42 Cardigans, 30 with texture, of which 12 also have stranded.

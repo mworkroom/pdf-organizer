@@ -1,5 +1,5 @@
 let galleryQuery='',galleryCategory='',galleryDesigner='',gallerySort='name',galleryLayout='grid';
-let galleryAttributes=[];
+let galleryAttributes=[],galleryAttributeMode='any';
 let gallerySearchPending=false;
 const libraryPageDrafts=new Map();
 let gallerySelectionCache;
@@ -70,18 +70,26 @@ const GalleryPreviews=(()=>{
   return {reset,observe,resume,suspend,obtain,get stats(){return {...stats,busy,urls:urls.size};}};
 })();
 
-function galleryState(){return {query:galleryQuery,category:galleryCategory,attributes:[...galleryAttributes],designerName:galleryDesigner,sort:gallerySort};}
+function galleryState(){return {query:galleryQuery,category:galleryCategory,attributes:[...galleryAttributes],attributeMode:galleryAttributeMode,designerName:galleryDesigner,sort:gallerySort};}
 function selectedGalleryPatterns(){
   const state=JSON.stringify(galleryState());
   if(!gallerySelectionCache||gallerySelectionCache.catalog!==libraryCatalog||gallerySelectionCache.state!==state)gallerySelectionCache={catalog:libraryCatalog,state,patterns:GalleryModel.select(libraryCatalog,galleryState())};
   return gallerySelectionCache.patterns;
 }
 function populateGalleryFilters(){
-  const host=document.getElementById('libraryAttributeFilter');
-  if(!host.children.length)host.append(attributePicker(galleryAttributes,ids=>{
-    galleryAttributes=ids;gallerySearchPending=false;libraryPage=0;
-    clearLibrarySelection(librarySelection.size?'Selection cleared because attributes changed.':'');renderLibraryPatterns();
-  },'Attributes (match all)'));
+  const host=document.getElementById('libraryAttributeFilter'),definitions=availableAttributes(),key=JSON.stringify(definitions);
+  galleryAttributes=CatalogModel.attributeIds(galleryAttributes,definitions);
+  if(host.dataset.attributes!==key||!host.children.length){
+    const changed=()=>{gallerySearchPending=false;libraryPage=0;clearLibrarySelection(librarySelection.size?'Selection cleared because attributes changed.':'');renderLibraryPatterns();};
+    const label=document.createElement('label');label.className='attribute-mode-label';label.textContent='Attributes condition';
+    const mode=document.createElement('select');mode.id='libraryAttributeMode';mode.className='text-input';
+    for(const [value,text] of [['any','Any'],['none','None'],['selected','Selected attributes']])mode.add(new Option(text,value));
+    mode.onchange=()=>{galleryAttributeMode=mode.value;if(mode.value!=='selected')galleryAttributes=[];changed();};label.append(mode);
+    const picker=attributePicker(galleryAttributes,ids=>{galleryAttributes=ids;galleryAttributeMode=ids.length?'selected':'any';changed();},'Attributes (match all)');
+    host.replaceChildren(label,picker);host.dataset.attributes=key;
+  }
+  host.querySelector('select').value=galleryAttributeMode;
+  host.querySelector('fieldset').hidden=galleryAttributeMode==='none';
   host.querySelectorAll('input').forEach(input=>input.checked=galleryAttributes.includes(input.value));
   const category=document.getElementById('libraryCategoryFilter'),designer=document.getElementById('libraryDesignerFilter');
   category.replaceChildren(new Option('All categories',''));
@@ -95,7 +103,7 @@ function populateGalleryFilters(){
 function renderGalleryControls(){
   const disabled=operationBusy||draftLockedElsewhere||!libraryCatalog;
   for(const id of ['librarySearch','libraryCategoryFilter','libraryDesignerFilter','librarySort','galleryGridButton','galleryListButton','clearGalleryFiltersButton','clearThumbnailCacheButton'])document.getElementById(id).disabled=disabled;
-  document.querySelectorAll('#libraryAttributeFilter input').forEach(input=>input.disabled=disabled);
+  document.querySelectorAll('#libraryAttributeFilter input,#libraryAttributeFilter select').forEach(input=>input.disabled=disabled);
   document.querySelectorAll('[data-gallery-action]').forEach(control=>control.disabled=disabled||Boolean(catalogError));
   const state=GalleryModel.page(selectedGalleryPatterns(),libraryPage);
   for(const id of ['libraryPreviousButton','galleryPreviousBottom'])document.getElementById(id).disabled=disabled||state.current===0;
@@ -127,7 +135,7 @@ function renderGallery(){
     const designer=document.createElement(designerName?'button':'span');designer.className='pattern-designer';designer.textContent=designerName||'Root / special folder';
     if(designerName){designer.type='button';designer.classList.add('pattern-link');designer.dataset.galleryAction='';designer.title='Show patterns by this designer';designer.onclick=()=>filterGalleryDesigner(designerName);}
     const labels=document.createElement('span');labels.className='category-labels';labels.textContent=pattern.categoryIds.map(id=>libraryCatalog.categories.find(c=>c.id===id)?.name).join(' · ');
-    const attributes=document.createElement('span');attributes.className='attribute-labels';attributes.textContent=CatalogModel.attributeIds(pattern.attributeIds).join(' · ');
+    const attributes=document.createElement('span');attributes.className='attribute-labels';attributes.textContent=attributeNames(pattern.attributeIds).join(' · ');
     const caption=document.createElement('span');caption.className='pattern-page-caption';caption.textContent=`Cover page ${GalleryModel.representative(pattern)}`;
     card._pageCaption=caption;
     const edit=document.createElement('button');edit.type='button';edit.className='pattern-edit-button';edit.dataset.galleryAction='';edit.textContent='Edit';edit.setAttribute('aria-label','Edit');edit.setAttribute('aria-expanded','false');edit.setAttribute('aria-controls',`gallery-editor-${pattern.id}`);edit.title='Edit categories, attributes and cover page';
@@ -151,6 +159,7 @@ function setGalleryEditing(card,pattern,file,open){
   const editor=card.querySelector('.gallery-editor');if(editor)editor.hidden=!open;
   const button=card.querySelector('.pattern-edit-button');button.textContent=open?'Close':'Edit';button.setAttribute('aria-label',open?'Close editor':'Edit');button.setAttribute('aria-expanded',String(open));
 }
+function hasLibraryPatternEdits(id){return libraryCategoryDrafts.has(id)||libraryAttributeDrafts.has(id)||libraryPageDrafts.has(id);}
 function mountGalleryEditor(card,pattern,file){
   const editor=document.createElement('div');editor.className='gallery-editor';editor.id=`gallery-editor-${pattern.id}`;
   const path=document.createElement('p');path.className='pattern-path';path.textContent=pattern.path;editor.append(path,card._pageCaption);
@@ -161,30 +170,42 @@ function mountGalleryEditor(card,pattern,file){
     if(pattern.analysis.matches.length)result.textContent+=` · Categories found in title: ${pattern.analysis.matches.map(id=>libraryCatalog.categories.find(c=>c.id===id)?.name).join(', ')}`;
     editor.append(result);
   }
-  let ids=[...(libraryCategoryDrafts.get(pattern.id)||pattern.categoryIds)];
-  const notice=document.createElement('p');notice.className='note';notice.textContent=libraryCategoryDrafts.has(pattern.id)?'Editing. Select Save categories when ready.':'Select categories, then save.';
-  editor.append(categoryPicker(ids,value=>{ids=value;libraryCategoryDrafts.set(pattern.id,[...value]);notice.textContent='Editing. Select Save categories when ready.';},`${pattern.path} Category`),notice);
-  let attributes=[...(libraryAttributeDrafts.get(pattern.id)||CatalogModel.attributeIds(pattern.attributeIds))];
-  const attributeNotice=document.createElement('p');attributeNotice.className='note';
-  attributeNotice.textContent=libraryAttributeDrafts.has(pattern.id)?'Editing attributes. Select Save attributes when ready.':'Attributes are optional. Select any that apply.';
-  editor.append(attributePicker(attributes,value=>{attributes=value;libraryAttributeDrafts.set(pattern.id,[...value]);attributeNotice.textContent='Editing attributes. Select Save attributes when ready.';}),attributeNotice);
-  const actions=document.createElement('div');actions.className='gallery-editor-actions';
-  const button=(text,callback)=>{const node=document.createElement('button');node.type='button';node.className='secondary-button';node.textContent=text;node.onclick=callback;actions.append(node);return node;};
-  button('Save categories',()=>catalogAction(async()=>{const next=structuredClone(libraryCatalog);const target=next.patterns.find(p=>p.id===pattern.id);target.categoryIds=ids;target.categorySource='manual';await persistCatalog(next);libraryCategoryDrafts.delete(pattern.id);})).dataset.catalogControl='';
-  button('Save attributes',()=>catalogAction(async()=>{const next=CatalogModel.replaceAttributes(libraryCatalog,[pattern.id],attributes);await persistCatalog(next);libraryAttributeDrafts.delete(pattern.id);})).dataset.catalogControl='';
-  button('Cancel changes',()=>{libraryCategoryDrafts.delete(pattern.id);libraryAttributeDrafts.delete(pattern.id);libraryPageDrafts.delete(pattern.id);renderLibraryPatterns();});
-  button('Open PDF',()=>openReviewPdf(file));editor.append(actions);
+  const notice=document.createElement('p');notice.className='note';
+  const edited=()=>{notice.textContent='Unsaved changes. Select Save changes when ready.';renderCatalogControls();};
+  notice.textContent=hasLibraryPatternEdits(pattern.id)?'Unsaved changes. Select Save changes when ready.':'Categories, optional attributes and cover page are saved together.';
+  const ids=[...(libraryCategoryDrafts.get(pattern.id)||pattern.categoryIds)];
+  editor.append(categoryPicker(ids,value=>{libraryCategoryDrafts.set(pattern.id,[...value]);edited();},`${pattern.path} Category`));
+  const attributes=[...(libraryAttributeDrafts.get(pattern.id)||CatalogModel.attributeIds(pattern.attributeIds,availableAttributes()))];
+  editor.append(attributePicker(attributes,value=>{libraryAttributeDrafts.set(pattern.id,[...value]);edited();}));
   const pageTools=document.createElement('div');pageTools.className='representative-page-tools';
   const label=document.createElement('label');label.textContent='Cover page';label.htmlFor=`representative-${pattern.id}`;
   const input=document.createElement('input');input.id=label.htmlFor;input.type='number';input.min='1';input.step='1';input.value=libraryPageDrafts.get(pattern.id)??GalleryModel.representative(pattern);input.className='text-input representative-page-input';if(card.dataset.pages)input.max=card.dataset.pages;
-  input.oninput=()=>{libraryPageDrafts.set(pattern.id,input.value);};
-  const savePage=document.createElement('button');savePage.type='button';savePage.className='secondary-button';savePage.textContent='Save cover page';savePage.dataset.catalogControl='';
-  savePage.onclick=()=>catalogAction(async()=>{
-    const number=Number(input.value);if(!Number.isSafeInteger(number)||number<1)throw new Error('Enter a whole number of 1 or greater for the cover page.');
-    await GalleryPreviews.obtain(file,pattern,number);
-    const next=structuredClone(libraryCatalog);next.patterns.find(p=>p.id===pattern.id).representativePage=number;await persistCatalog(next);libraryPageDrafts.delete(pattern.id);
+  input.oninput=()=>{libraryPageDrafts.set(pattern.id,input.value);edited();};
+  pageTools.append(label,input);editor.append(pageTools,notice);
+  const actions=document.createElement('div');actions.className='gallery-editor-actions';
+  const button=(text,callback)=>{const node=document.createElement('button');node.type='button';node.className='secondary-button';node.textContent=text;node.onclick=callback;actions.append(node);return node;};
+  const save=button('Save changes',()=>{
+    if(!hasLibraryPatternEdits(pattern.id))return;
+    return catalogAction(async()=>{
+      const current=libraryCatalog?.patterns.find(p=>p.id===pattern.id&&p.present);
+      if(!current)throw new Error('This pattern has changed. Refresh the library and try again.');
+      let number;
+      if(libraryPageDrafts.has(pattern.id)){
+        number=Number(libraryPageDrafts.get(pattern.id));
+        if(!Number.isSafeInteger(number)||number<1)throw new Error('Enter a whole number of 1 or greater for the cover page.');
+        if(number!==GalleryModel.representative(current))await GalleryPreviews.obtain(file,current,number);
+      }
+      const next=structuredClone(libraryCatalog),target=next.patterns.find(p=>p.id===pattern.id);
+      if(libraryCategoryDrafts.has(pattern.id)){target.categoryIds=[...libraryCategoryDrafts.get(pattern.id)];target.categorySource='manual';}
+      if(libraryAttributeDrafts.has(pattern.id))target.attributeIds=[...libraryAttributeDrafts.get(pattern.id)];
+      if(number!==undefined)target.representativePage=number;
+      await persistCatalog(next);
+      libraryCategoryDrafts.delete(pattern.id);libraryAttributeDrafts.delete(pattern.id);libraryPageDrafts.delete(pattern.id);
+    });
   });
-  pageTools.append(label,input,savePage);editor.append(pageTools);card.append(editor);
+  save.className='';save.dataset.catalogControl='';save.dataset.librarySave=pattern.id;
+  button('Cancel changes',()=>{libraryCategoryDrafts.delete(pattern.id);libraryAttributeDrafts.delete(pattern.id);libraryPageDrafts.delete(pattern.id);renderLibraryPatterns();});
+  button('Open PDF',()=>openReviewPdf(file));editor.append(actions);card.append(editor);
   renderCatalogControls();if(operationBusy)setOperationBusy(true);
 }
 function initializeGalleryControls(){
@@ -197,7 +218,7 @@ function initializeGalleryControls(){
   document.getElementById('libraryDesignerFilter').onchange=event=>{galleryDesigner=event.target.value;filtersChanged();changed();};
   document.getElementById('librarySort').onchange=event=>{gallerySort=event.target.value;changed();};
   for(const mode of ['grid','list'])document.getElementById(mode==='grid'?'galleryGridButton':'galleryListButton').onclick=()=>{galleryLayout=mode;try{localStorage.setItem('pdfOrganizerLibraryLayout',mode);}catch{}renderLibraryPatterns();};
-  document.getElementById('clearGalleryFiltersButton').onclick=()=>{clearTimeout(searchTimer);galleryQuery='';galleryCategory='';galleryAttributes=[];galleryDesigner='';document.getElementById('librarySearch').value='';filtersChanged();changed();};
+  document.getElementById('clearGalleryFiltersButton').onclick=()=>{clearTimeout(searchTimer);galleryQuery='';galleryCategory='';galleryAttributes=[];galleryAttributeMode='any';galleryDesigner='';document.getElementById('librarySearch').value='';filtersChanged();changed();};
   document.getElementById('clearThumbnailCacheButton').onclick=async()=>{
     if(operationBusy)return;GalleryPreviews.suspend();setOperationBusy(true);
     let failed=false;

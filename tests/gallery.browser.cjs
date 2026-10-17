@@ -8,12 +8,12 @@ async function main(){
   const wait=(predicate,arg)=>page.waitForFunction(predicate,arg);
   const search=async text=>{await page.getByRole('searchbox',{name:'Search patterns',exact:true}).fill(text);await wait(value=>document.querySelector('#libraryPatternList').dataset.query===value,text);};
   const root=()=>page.locator('.library-pattern').filter({hasText:'Root_Sweater'});
-  const readyRoot=()=>wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready'&&document.querySelectorAll('.library-pattern').length===1);
+  const readyRoot=async()=>{await root().scrollIntoViewIfNeeded();await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='ready'&&document.querySelectorAll('.library-pattern').length===1);};
   try{
     await page.goto((process.env.PDF_ORGANIZER_TEST_URL||'http://127.0.0.1:8766/')+'?qa=1');await button('Prepare 131 gallery samples').click();
     await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===131);
     assert.equal((await report()).pdfStats.reads,0);assert.equal((await report()).galleryCards,24);
-    await button('Pattern Library').click();await wait(()=>document.querySelector('.library-pattern[data-preview="ready"]'));
+    await button('Pattern Library').click();await page.locator('.library-pattern').first().scrollIntoViewIfNeeded();await wait(()=>document.querySelector('.library-pattern[data-preview="ready"]'));
     assert.ok((await report()).pdfStats.reads<131);
     // Card actions are independent: the preview/body do not open the editor.
     await search('Root_Sweater');await readyRoot();
@@ -48,19 +48,47 @@ async function main(){
     await search('sweater');await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).waitFor();assert.equal(await multiple.getByRole('checkbox',{name:'Shawl',exact:true}).isChecked(),true);await button('Cancel changes').click();
     await button('Clear filters').click();await wait(()=>document.querySelectorAll('.library-pattern').length===24);await button('Next').click();await wait(()=>document.querySelector('#libraryPageSummary').textContent.includes('2 / 6'));
     await search('Root_Sweater');await readyRoot();assert.equal(await root().locator('.pattern-page-caption').count(),0);
-    await root().getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('2');
+    await root().getByRole('button',{name:'Edit',exact:true}).click();
+    assert.equal(await root().getByRole('button',{name:'Save changes',exact:true}).isEnabled(),false);
+    assert.equal(await root().getByRole('button',{name:/^Save /}).count(),1);
+    const beforeCombined=await page.evaluate(()=>structuredClone(libraryCatalog));
+    await root().getByRole('checkbox',{name:'Cardigan',exact:true}).check();await root().getByRole('checkbox',{name:'texture',exact:true}).check();
+    await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('2');
     await button('Refresh library').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('Save or cancel'));assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');
-    await search('Broken');await search('Root_Sweater');await readyRoot();assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');await button('Save cover page').click();
+    await search('Broken');await search('Root_Sweater');await readyRoot();assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');
+    await button('Inject metadata save failure').click();await button('Save changes').click();await wait(()=>!operationBusy);
+    assert.match(await page.locator('#catalogStatus').innerText(),/QA metadata save failure/);
+    assert.deepEqual(await page.evaluate(()=>libraryCatalog),beforeCombined);
+    assert.equal(await root().getByRole('checkbox',{name:'Cardigan',exact:true}).isChecked(),true);assert.equal(await root().getByRole('checkbox',{name:'texture',exact:true}).isChecked(),true);
+    assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'2');
+    assert.deepEqual(await page.evaluate(async()=>JSON.parse(await (await (await libraryDirectoryHandle.getFileHandle(CATALOG_FILE_NAME)).getFile()).text())),beforeCombined);
+    // The one button stays reachable at both desktop widths while all drafts are pending.
+    for(const width of [2048,1280]){
+      await page.setViewportSize({width,height:1152});await root().evaluate(el=>window.scrollTo(0,el.getBoundingClientRect().top+scrollY-16));
+      const bounds=await button('Save changes').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth),true);
+      if(process.env.PDF_ORGANIZER_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.PDF_ORGANIZER_ARTIFACT_DIR,`pdf-organizer-unified-save-${width}.png`)});
+    }
+    await button('Clear injected errors').click();await button('Save changes').click();await wait(()=>!operationBusy);
+    const afterCombined=await page.evaluate(()=>structuredClone(libraryCatalog));assert.equal(afterCombined.revision,beforeCombined.revision+1);
+    for(const original of beforeCombined.patterns){const updated=afterCombined.patterns.find(p=>p.id===original.id);assert.deepEqual(updated,original.path==='Root_Sweater.pdf'?{...original,categoryIds:['sweater','cardigan'],categorySource:'manual',attributeIds:['texture'],representativePage:2}:original);}
+    assert.equal(await page.evaluate(()=>hasPendingLibraryEdits()),false);
     await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).representatives.some(p=>p.path==='Root_Sweater.pdf'&&p.page===2));await readyRoot();await root().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);await root().getByRole('button',{name:'Close editor',exact:true}).click();
     const originalId=(await report()).representatives[0].id;
     const readsBeforeClear=(await report()).pdfStats.reads;await button('Clear thumbnail cache').click();await wait(before=>JSON.parse(document.querySelector('#qaReport').textContent).pdfStats.reads>before,readsBeforeClear);await readyRoot();assert.equal((await report()).representatives[0].id,originalId);
-    await root().getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('99');await button('Save cover page').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('1~2'));assert.equal((await report()).representatives[0].page,2);
-    assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'99');await button('Cancel changes').click();
+    await root().getByRole('button',{name:'Edit',exact:true}).click();await page.getByRole('spinbutton',{name:'Cover page',exact:true}).fill('99');
+    await root().getByRole('checkbox',{name:'Hat',exact:true}).check();await root().getByRole('checkbox',{name:'stranded',exact:true}).check();
+    const beforeInvalid=await page.evaluate(()=>structuredClone(libraryCatalog));await button('Save changes').click();await wait(()=>document.querySelector('#catalogStatus').textContent.includes('1~2'));assert.equal((await report()).representatives[0].page,2);
+    assert.equal(await page.getByRole('spinbutton',{name:'Cover page',exact:true}).inputValue(),'99');assert.deepEqual(await page.evaluate(()=>libraryCatalog),beforeInvalid);assert.equal(await root().getByRole('checkbox',{name:'Hat',exact:true}).isChecked(),true);assert.equal(await root().getByRole('checkbox',{name:'stranded',exact:true}).isChecked(),true);await button('Cancel changes').click();
     await page.reload();await button('Reconnect sample library').click();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).galleryTotal===131);await search('Root_Sweater');await readyRoot();
     assert.equal((await report()).representatives[0].id,originalId);await root().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await root().innerText(),/Cover page 2 \/ 2 pages/);await root().getByRole('button',{name:'Close editor',exact:true}).click();
     await button('List').click();await readyRoot();assert.match(await page.locator('#libraryPatternList').getAttribute('class'),/list-view/);await button('Gallery').click();await readyRoot();
     await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).previewStats.hits>0);assert.equal((await report()).pdfStats.maxActive<=1,true);
     await search('Broken');await wait(()=>document.querySelector('.library-pattern')?.dataset.preview==='error');assert.equal(await button('Retry preview').isVisible(),true);assert.equal((await report()).galleryTotal,131);
+    await first().getByRole('button',{name:'Edit',exact:true}).click();await first().getByRole('checkbox',{name:'texture',exact:true}).check();
+    await page.evaluate(()=>{window.qaOriginalObtain=GalleryPreviews.obtain;GalleryPreviews.obtain=async()=>{throw new Error('Untouched cover must not be validated');};});
+    await button('Save changes').click();await wait(()=>!operationBusy);await page.evaluate(()=>{GalleryPreviews.obtain=window.qaOriginalObtain;});
+    const broken=await page.evaluate(()=>libraryCatalog.patterns.find(p=>p.path==='Broken.pdf'));assert.deepEqual(broken.attributeIds,['texture']);assert.equal(broken.categorySource,'filename');assert.deepEqual(broken.categoryIds,['unknown']);
+
     await search('Root_Sweater');await readyRoot();const hitsBefore=(await report()).previewStats.hits;await button('List').click();await readyRoot();await wait(()=>JSON.parse(document.querySelector('#qaReport').textContent).previewStats.hits>0);assert.ok((await report()).previewStats.hits>=hitsBefore);
     // Cache stress runs only in this isolated test context, never in J's browser.
     const limits=await page.evaluate(async()=>{

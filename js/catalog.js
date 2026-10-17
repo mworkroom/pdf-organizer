@@ -1,14 +1,17 @@
 const CATALOG_FILE_NAME='!pdf-organizer-library.json';
 const CATALOG_BACKUP_NAME='!pdf-organizer-library.backup.json';
 let libraryCatalog=null, catalogRoot=null, catalogDiskText=null, catalogError='';
+let reviewAttributes=null;
 let indexedLibraryFiles=[], libraryPage=0;
-let categoryEditorDirty=false;
+let categoryEditorDirty=false,attributeEditorDirty=false;
 const libraryCategoryDrafts=new Map();
 const libraryAttributeDrafts=new Map();
 const defaultCategories=CatalogModel.create().categories;
 
 function availableCategories(){return libraryCatalog?.categories || defaultCategories;}
-function hasPendingLibraryEdits(){return Boolean(categoryEditorDirty||libraryCategoryDrafts.size||libraryAttributeDrafts.size||libraryPageDrafts.size);}
+function availableAttributes(){return libraryCatalog?CatalogModel.attributeDefinitions(libraryCatalog):(reviewAttributes??CatalogModel.attributeDefinitions());}
+function attributeNames(ids){return availableAttributes().filter(item=>(ids||[]).includes(item.id)).map(item=>item.name);}
+function hasPendingLibraryEdits(){return Boolean(categoryEditorDirty||attributeEditorDirty||libraryCategoryDrafts.size||libraryAttributeDrafts.size||libraryPageDrafts.size);}
 function setCatalogStatus(message){document.getElementById('catalogStatus').textContent=message;}
 async function readCatalogText(root){
   try{return await (await root.getFileHandle(CATALOG_FILE_NAME)).getFile().then(file=>file.text());}
@@ -30,7 +33,7 @@ async function persistCatalog(next){
   const text=JSON.stringify(next,null,2)+'\n';
   if(current!==null)await writeCatalogText(catalogRoot,CATALOG_BACKUP_NAME,current);
   await writeCatalogText(catalogRoot,CATALOG_FILE_NAME,text);
-  libraryCatalog=next;catalogDiskText=text;
+  libraryCatalog=next;catalogDiskText=text;reviewAttributes=structuredClone(CatalogModel.attributeDefinitions(next));
   setCatalogStatus(`Metadata saved · PDFs: ${next.patterns.filter(p=>p.present).length} · Categories: ${next.categories.length}`);
 }
 async function loadLibraryCatalog(){
@@ -57,6 +60,7 @@ async function loadLibraryCatalog(){
     files.sort((a,b)=>a.path.localeCompare(b.path,'ko'));
     const next=CatalogModel.reconcile(libraryCatalog,files);
     if(catalogDiskText===null||JSON.stringify(next)!==JSON.stringify(libraryCatalog))await persistCatalog(next);
+    reviewAttributes=structuredClone(CatalogModel.attributeDefinitions(libraryCatalog));
     indexedLibraryFiles=files;
     setCatalogStatus(`Metadata saved · PDFs: ${files.length} · Categories: ${libraryCatalog.categories.length}`);
   }catch(error){
@@ -68,7 +72,9 @@ async function loadLibraryCatalog(){
 function inferReviewCategories(file){
   file.patternId ||= crypto.randomUUID();
   file.categoryIds=CatalogModel.categoryIds(file.categoryIds,availableCategories());
-  file.attributeIds=CatalogModel.attributeIds(file.attributeIds);
+  const normalized=CatalogModel.attributeIds(file.attributeIds,availableAttributes());
+  if(file.attributeIds!==undefined&&(!Array.isArray(file.attributeIds)||normalized.length!==file.attributeIds.length))throw new Error('Review attributes are missing from this pattern folder. Reconnect the original pattern folder or restore its attribute list.');
+  file.attributeIds=normalized;
   if(file.categorySource!=='manual'){
     file.categoryIds=CatalogModel.infer(file.patternFileName||file.name,availableCategories());file.categorySource='filename';
   }
@@ -95,13 +101,14 @@ function categoryPicker(ids,onChange,label='Category',allowEmpty=false){
 function attributePicker(ids,onChange,label='Attributes'){
   const field=document.createElement('fieldset');field.className='category-picker attribute-picker';
   const legend=document.createElement('legend');legend.textContent=label;field.append(legend);
-  const selected=CatalogModel.attributeIds(ids);
-  for(const id of CatalogModel.attributes){
+  const selected=CatalogModel.attributeIds(ids,availableAttributes());
+  for(const attribute of availableAttributes()){
+    const id=attribute.id;
     const item=document.createElement('label'),input=document.createElement('input'),name=document.createElement('span');
     input.type='checkbox';input.value=id;input.checked=selected.includes(id);input.disabled=draftLockedElsewhere;
-    name.textContent=id;item.append(input,name);field.append(item);
+    name.textContent=attribute.name;item.append(input,name);field.append(item);
     input.onchange=()=>{
-      onChange(CatalogModel.attributeIds([...field.querySelectorAll('input:checked')].map(control=>control.value)));
+      onChange(CatalogModel.attributeIds([...field.querySelectorAll('input:checked')].map(control=>control.value),availableAttributes()));
     };
   }
   return field;
@@ -130,13 +137,13 @@ async function catalogAction(action){
 }
 function renderCatalogControls(){
   const disabled=operationBusy||draftLockedElsewhere||!libraryCatalog||Boolean(catalogError);
-  document.querySelectorAll('[data-catalog-control]').forEach(control=>control.disabled=disabled);
+  document.querySelectorAll('[data-catalog-control]').forEach(control=>control.disabled=disabled||Boolean(control.dataset.librarySave&&!hasLibraryPatternEdits(control.dataset.librarySave)));
   document.getElementById('refreshLibraryButton').disabled=operationBusy||draftLockedElsewhere||!libraryDirectoryHandle;
-  renderGalleryControls();
+  refreshAttributeOrderButtons();renderGalleryControls();
   if(typeof renderMaintenanceControls==='function')renderMaintenanceControls();
 }
 function renderCatalogUI(){
-  renderCategoryManager();renderLibraryPatterns();
+  renderCategoryManager();renderAttributeManager();renderLibraryPatterns();
   if(typeof renderMaintenance==='function')renderMaintenance();
   renderCatalogControls();
   if(operationBusy)setOperationBusy(true);
@@ -210,6 +217,7 @@ async function persistMovedPattern(plan,copiedFile,sha256){
   await persistCatalog(next);
 }
 function initializeCatalogControls(){
+  initializeAttributeControls();
   const cancel=document.createElement('button');cancel.id='cancelCategoryEditsButton';cancel.type='button';cancel.className='secondary-button';cancel.dataset.catalogControl='';cancel.textContent='Cancel category edits';
   document.getElementById('saveCategoriesButton').after(cancel);
   cancel.onclick=()=>{categoryEditorDirty=false;document.getElementById('newCategoryName').value='';renderCategoryManager();renderCatalogControls();setCatalogStatus('Category edits canceled. Saved classifications are preserved.');};

@@ -2,7 +2,7 @@
 let librarySelectionMode=false,librarySelectionId='',libraryBulkCategories=[],libraryBulkMessage='';
 let libraryBulkAttributes=[];
 const librarySelection=new Map();
-let libraryBulkCategoryKey='';
+let libraryBulkCategoryKey='',libraryBulkAttributeKey='';
 const libraryPatternSignature=pattern=>JSON.stringify([pattern.path,pattern.size,pattern.lastModified]);
 
 function clearLibrarySelection(message=''){
@@ -59,9 +59,11 @@ function renderLibraryBulkControls(){
   }
   document.getElementById('applyLibraryCategoriesButton').disabled=disabled||!librarySelection.size||!libraryBulkCategories.length;
   const attributeHost=document.getElementById('libraryBulkAttributePicker');
-  if(librarySelectionMode&&!attributeHost.children.length)attributeHost.append(attributePicker(libraryBulkAttributes,ids=>{
-    libraryBulkAttributes=ids;libraryBulkMessage='';renderLibraryBulkControls();
-  },'Replacement attributes'));
+  const attributeKey=JSON.stringify(availableAttributes());
+  if(librarySelectionMode&&(!attributeHost.children.length||libraryBulkAttributeKey!==attributeKey)){
+    libraryBulkAttributeKey=attributeKey;libraryBulkAttributes=CatalogModel.attributeIds(libraryBulkAttributes,availableAttributes());
+    attributeHost.replaceChildren(attributePicker(libraryBulkAttributes,ids=>{libraryBulkAttributes=ids;libraryBulkMessage='';renderLibraryBulkControls();},'Replacement attributes'));
+  }
   document.getElementById('applyLibraryAttributesButton').disabled=disabled||!librarySelection.size||!libraryBulkAttributes.length;
   document.getElementById('clearLibraryAttributesButton').disabled=disabled||!librarySelection.size;
   document.querySelectorAll('#libraryBulkCategoryPicker input,#libraryBulkAttributePicker input,[data-library-selection]').forEach(input=>{
@@ -100,7 +102,7 @@ async function applyLibraryClassification(kind,clear=false){
     const attributeChange=kind==='attributes',ids=attributeChange?(clear?[]:libraryBulkAttributes):libraryBulkCategories;
     if(attributeChange&&!clear&&!ids.length)throw new Error('Choose replacement attributes or use Clear attributes.');
     const next=attributeChange?CatalogModel.replaceAttributes(libraryCatalog,[...librarySelection.keys()],ids):CatalogModel.replaceCategories(libraryCatalog,[...librarySelection.keys()],ids);
-    const count=librarySelection.size,names=attributeChange?ids.join(', '):ids.map(id=>libraryCatalog.categories.find(category=>category.id===id).name).join(', ');
+    const count=librarySelection.size,names=attributeChange?attributeNames(ids).join(', '):ids.map(id=>libraryCatalog.categories.find(category=>category.id===id).name).join(', ');
     const confirmation=attributeChange?
       `${clear?'Clear all attributes from':'Replace the attributes of'} ${count} selected patterns${clear?'':` with ${names}`}?\n\nExisting attributes will be replaced. Categories and PDF files will be preserved.`:
       `Replace the categories of ${count} selected patterns with ${names}?\n\nExisting categories will be replaced and saved as manual classifications. PDF files will not be moved or renamed.`;
