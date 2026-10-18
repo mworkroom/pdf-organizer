@@ -44,6 +44,42 @@ test('restore preserves frozen membership; new files join waiting queue', () => 
   assert.equal(state.reviewSelections.size,1);
 });
 
+test('resume opens all 52 deferred reviews with edits and exclusions intact', () => {
+  const state=load(),records=files(52);
+  records[0].excluded=true;records[0].categoryIds=['cardigan'];records[0].attributeIds=['texture'];records[0].patternId='stable-id';
+  const draft={version:2,batchNumber:2,files:records.map(file=>({...file,role:'deferred',deferredReason:'On hold'}))};
+  const resumed=state.restoreBatchMembership(records,draft);
+  assert.equal(resumed.reopenedFrom,'deferred');assert.equal(resumed.excluded,1);
+  assert.equal(state.downloadFiles.length,52);assert.equal(state.deferredDownloadFiles.length,0);
+  assert.equal(state.queuedDownloadFiles.length,0);assert.equal(state.batchNumber,2);
+  assert.equal(state.downloadFiles[0],records[0]);assert.equal(records[0].excluded,true);
+  assert.equal(records[0].patternFileName,'manual-0.pdf');assert.equal(records[0].patternId,'stable-id');
+  assert.deepEqual(records[0].categoryIds,['cardigan']);assert.deepEqual(records[0].attributeIds,['texture']);
+  assert.equal(records[0].analysis.action,'unchecked');assert.equal(state.selectedReviewName,'file-0.pdf');
+});
+
+test('resume caps deferred work at 100 and does not expand a restored current batch', () => {
+  const state=load(),records=files(152).map(file=>({...file,excluded:true}));
+  state.restoreBatchMembership(records,{version:2,files:records.map(file=>({...file,role:'deferred'}))});
+  assert.equal(state.downloadFiles.length,100);assert.equal(state.deferredDownloadFiles.length,52);
+  assert.equal(state.downloadFiles.every(file=>file.excluded),true);
+  const snapshot={version:2,files:state.serializeBatchFiles()};
+  const resumed=state.restoreBatchMembership(records,snapshot);
+  assert.equal(resumed.reopenedFrom,'');assert.equal(state.downloadFiles.length,100);
+  assert.equal(state.deferredDownloadFiles.length,52);
+});
+
+test('resume prioritizes queued files, skips missing files and leaves deferred work separate', () => {
+  const state=load(),records=files(3);
+  state.restoreBatchMembership(records,{version:2,files:[
+    {name:'missing.pdf',role:'current'},{name:'file-0.pdf',role:'deferred'},
+    {name:'file-1.pdf',role:'queued'},{name:'file-2.pdf',role:'queued'}
+  ]});
+  assert.deepEqual(Array.from(state.downloadFiles,file=>file.name),['file-1.pdf','file-2.pdf']);
+  assert.deepEqual(Array.from(state.deferredDownloadFiles,file=>file.name),['file-0.pdf']);
+  assert.equal(state.queuedDownloadFiles.length,0);
+});
+
 test('completed work defers held/excluded files and never adds them to the next queue', () => {
   const state=load();
   state.downloadFiles=[{name:'done.pdf',completed:true},{name:'hold.pdf',analysis:{action:'hold',message:'충돌'}},{name:'skip.pdf',excluded:true,analysis:{action:'excluded'}}];

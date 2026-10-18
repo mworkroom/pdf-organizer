@@ -52,11 +52,26 @@ function restoreBatchMembership(records, draft) {
     byName.delete(saved.name);
   }
   queuedDownloadFiles.push(...byName.values());
+  // Resume is an explicit request to continue reviewing. A completed/deferred
+  // batch can have no current files even though reviews remain on disk.
+  let reopenedFrom = "";
+  if (!downloadFiles.length) {
+    const source = queuedDownloadFiles.length ? queuedDownloadFiles : deferredDownloadFiles;
+    reopenedFrom = queuedDownloadFiles.length ? "queued" : source.length ? "deferred" : "";
+    downloadFiles = source.splice(0, BATCH_LIMIT);
+    for (const file of downloadFiles) {
+      file.completed = false;
+      file.deferredReason = "";
+      file.analysis = { action: "unchecked", message: "", matchPath: "" };
+      // Keep explicit exclusions and all manual edits when resuming a review.
+    }
+  }
   batchNumber = Number.isInteger(draft.batchNumber) && draft.batchNumber > 0 ? draft.batchNumber : 1;
   selectedReviewName = downloadFiles.some(file => file.name === draft.selectedReviewName) ? draft.selectedReviewName : (downloadFiles[0]?.name || "");
   reviewSelections = new Set((Array.isArray(draft.selections) ? draft.selections : []).filter(name => downloadFiles.some(file => file.name === name)));
   batchInitialized = true;
   setActiveView(draft.view === "library" ? "library" : "organize");
+  return { reopenedFrom, count: downloadFiles.length, excluded: downloadFiles.filter(file => file.excluded).length };
 }
 
 function finishCurrentBatch() {

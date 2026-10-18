@@ -163,12 +163,15 @@ async function restoreReviewDraft() {
     }
     downloadFolderName.textContent = `Selected folder: ${downloadDirectoryHandle.name}`;
     libraryFolderName.textContent = libraryDirectoryHandle ? `Selected folder: ${libraryDirectoryHandle.name}` : "";
-    restoreBatchMembership(getAllReviewFiles(), draft);
+    const resumed = restoreBatchMembership(getAllReviewFiles(), draft);
     renderDownloadFileList();
     renderSortingRows();
     loaded = true;
     duplicateCheckComplete = false;
-    executeStatus.textContent = `Restored ${restored} reviews. Review ${changed} changed files again. Check duplicates before organizing.`;
+    const reopened = resumed.reopenedFrom ? ` Opened ${resumed.count} ${resumed.reopenedFrom} reviews for editing.` : "";
+    const excluded = resumed.excluded ? ` ${resumed.excluded} ${resumed.excluded === 1 ? "file remains" : "files remain"} excluded. Uncheck “Exclude from this run” on files to include them.` : "";
+    const changedFiles = changed ? ` Review ${changed} changed files again.` : "";
+    executeStatus.textContent = `Restored ${restored} reviews.${reopened}${excluded}${changedFiles} Check duplicates before organizing.`;
     pendingDraft = null;
     draftRecovery.classList.add("hidden");
     suppressDraftSave = false;
