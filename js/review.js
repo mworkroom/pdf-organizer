@@ -18,13 +18,18 @@ function invalidateDuplicateCheck() {
   updateAllPreviews();
 }
 
-function getIncompleteFiles() {
-  return downloadFiles.filter((file) => {
-    if (file.excluded) return false;
+function getMissingReviewDetails(file) {
+  if (file.excluded) return [];
+  const missing = [];
+  if (!file.destinationName.trim()) missing.push('Destination designer');
+  if (!ensurePdfExtension(file.patternFileName.trim())) missing.push('Filename');
+  if (!availableCategories().some(item => Array.isArray(file.categoryIds) && file.categoryIds.includes(item.id))) missing.push('Categories');
+  if (!availableAttributes().some(item => Array.isArray(file.attributeIds) && file.attributeIds.includes(item.id))) missing.push('Attributes');
+  return missing;
+}
 
-    const patternFileName = ensurePdfExtension(file.patternFileName.trim());
-    return !patternFileName || !file.destinationName.trim();
-  });
+function getIncompleteFiles() {
+  return downloadFiles.filter(file => getMissingReviewDetails(file).length);
 }
 
 function hasIncompleteFiles() {
@@ -32,11 +37,26 @@ function hasIncompleteFiles() {
 }
 
 function clearIncompleteHighlights() {
-  downloadFiles.forEach((file) => {
-    file.rowElement?.classList.remove("incomplete");
-    file.destinationInputElement?.classList.remove("incomplete-input");
-    file.patternInputElement?.classList.remove("incomplete-input");
-  });
+  downloadFiles.forEach(file => updateIncompleteHighlights(file, false));
+}
+
+function updateIncompleteHighlights(file, showErrors = true) {
+  const missing = showErrors ? getMissingReviewDetails(file) : [];
+  file.rowElement?.classList.toggle('incomplete', Boolean(missing.length));
+  const fields = [
+    ['Destination designer', file.destinationInputElement], ['Filename', file.patternInputElement],
+    ['Categories', file.rowElement?.querySelector('[data-review-field="categories"]')],
+    ['Attributes', file.rowElement?.querySelector('[data-review-field="attributes"]')]
+  ];
+  for (const [name, element] of fields) {
+    if (!element) continue;
+    const invalid = missing.includes(name);
+    element.classList.toggle('incomplete-input', invalid);
+    if (invalid) element.setAttribute('aria-invalid', 'true');
+    else element.removeAttribute('aria-invalid');
+    const error = element.querySelector('.classification-error');
+    if (error) error.hidden = !invalid;
+  }
 }
 
 function validateCompletenessAndFocus() {
@@ -47,12 +67,8 @@ function validateCompletenessAndFocus() {
   selectReviewFile(incompleteFiles[0].name);
 
   incompleteFiles.forEach((file) => {
-    file.rowElement?.classList.add("incomplete");
-    if (!file.destinationName.trim()) {
-      file.destinationInputElement?.classList.add("incomplete-input");
-    }
-    if (!ensurePdfExtension(file.patternFileName.trim())) {
-      file.patternInputElement?.classList.add("incomplete-input");
+    updateIncompleteHighlights(file);
+    if (getMissingReviewDetails(file).includes('Filename')) {
       const editor = file.rowElement?.querySelector('.filename-editor');
       if (editor) editor.open = true;
     }
@@ -62,14 +78,18 @@ function validateCompletenessAndFocus() {
   alert(
     `${incompleteFiles.length} files have missing details.\n\n` +
     `First incomplete file: ${first.name}\n` +
+    `Required: ${getMissingReviewDetails(first).join(', ')}\n` +
     `Select OK to go to that file.`
   );
+  executeStatus.className = 'execute-status error';
+  executeStatus.textContent = `Complete the required details for ${incompleteFiles.length} files before checking duplicates or organizing. Each included file needs a category and an attribute.`;
 
   requestAnimationFrame(() => {
     first.rowElement?.scrollIntoView({ behavior: "smooth", block: "center" });
-    const target = !first.destinationName.trim()
-      ? first.destinationInputElement
-      : first.patternInputElement;
+    const missing = getMissingReviewDetails(first);
+    const target = missing.includes('Destination designer') ? first.destinationInputElement
+      : missing.includes('Filename') ? first.patternInputElement
+      : first.rowElement?.querySelector(`[data-review-field="${missing.includes('Categories') ? 'categories' : 'attributes'}"] input:not(:disabled)`);
     target?.focus({ preventScroll: true });
   });
 
@@ -483,6 +503,7 @@ function renderSuggestions(
 
 function updateAllPreviews() {
   downloadFiles.forEach((file) => {
+    if (file.rowElement?.classList.contains('incomplete')) updateIncompleteHighlights(file);
     updatePreview(file);
     updateRowStatus(file);
   });
@@ -575,6 +596,13 @@ function updateRowStatus(file) {
     status.className = "row-status excluded";
     status.textContent =
       "Excluded from this run. This file will not be checked or organized.";
+    return;
+  }
+
+  const missing = getMissingReviewDetails(file);
+  if (missing.length) {
+    status.className = 'row-status hold';
+    status.textContent = `Required: ${missing.join(', ')}`;
     return;
   }
 

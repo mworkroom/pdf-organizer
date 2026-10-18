@@ -57,6 +57,7 @@ async function main(){
     }
     await resume(52); // The new current membership survives another reload.
     await row(2).getByRole('checkbox',{name:'Exclude from this run',exact:true}).uncheck();
+    await page.evaluate(()=>{for(const file of downloadFiles)if(!file.attributeIds.length)file.attributeIds=['texture'];renderSortingRows();scheduleDraftSave();});
     await button('Check duplicates').click();await wait(()=>duplicateCheckComplete&&!operationBusy);
     await button('Organize batch').click();await wait(()=>!operationBusy&&!downloadFiles.length);
     assert.match(await page.locator('#executeStatus').innerText(),/Organization complete/);

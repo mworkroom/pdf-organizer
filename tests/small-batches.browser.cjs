@@ -8,7 +8,10 @@ async function main(){
   const prepareUnique=async()=>{
     const row=page.locator('#sortingList .sort-row').nth(1);await row.locator('.filename-editor summary').click();await row.getByRole('textbox',{name:'Pattern filename for Designer_Pattern_001.pdf',exact:true}).fill('Unique_001.pdf');
   };
-  const organize=async()=>{await button('Check duplicates').click();await wait(()=>duplicateCheckComplete&&!operationBusy);await button('Organize batch').click();await wait(()=>!operationBusy&&!downloadFiles.length);assert.match(await page.locator('#executeStatus').innerText(),/Organization complete/);};
+  const organize=async()=>{
+    await page.evaluate(()=>{for(const file of downloadFiles)file.attributeIds=['texture'];renderSortingRows();scheduleDraftSave();});
+    await button('Check duplicates').click();await wait(()=>duplicateCheckComplete&&!operationBusy);await button('Organize batch').click();await wait(()=>!operationBusy&&!downloadFiles.length);assert.match(await page.locator('#executeStatus').innerText(),/Organization complete/);
+  };
   try{
     await page.goto('http://127.0.0.1:8766/?qa=1');
     for(const count of [1,2,48,99]){

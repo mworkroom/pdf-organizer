@@ -71,7 +71,7 @@ async function loadLibraryCatalog(){
 }
 function inferReviewCategories(file){
   file.patternId ||= crypto.randomUUID();
-  file.categoryIds=CatalogModel.categoryIds(file.categoryIds,availableCategories());
+  file.categoryIds=file.categorySource==='manual'&&Array.isArray(file.categoryIds)&&!file.categoryIds.length?[]:CatalogModel.categoryIds(file.categoryIds,availableCategories());
   const normalized=CatalogModel.attributeIds(file.attributeIds,availableAttributes());
   if(file.attributeIds!==undefined&&(!Array.isArray(file.attributeIds)||normalized.length!==file.attributeIds.length))throw new Error('Review attributes are missing from this pattern folder. Reconnect the original pattern folder or restore its attribute list.');
   file.attributeIds=normalized;
@@ -116,7 +116,8 @@ function attributePicker(ids,onChange,label='Attributes'){
 function renderReviewCategories(file){
   inferReviewCategories(file);
   const section=document.createElement('div');section.className='review-categories';
-  section.append(categoryPicker(file.categoryIds,ids=>{file.categoryIds=ids;file.categorySource='manual';scheduleDraftSave();section.querySelector('.note').textContent='Manual classification. Preserved during reanalysis.';},'Categories (select multiple)'));
+  const categoryField=categoryPicker(file.categoryIds,ids=>{file.categoryIds=ids;file.categorySource='manual';scheduleDraftSave();section.querySelector('.note').textContent='Manual classification. Preserved during reanalysis.';refreshValidation();},'Categories (select multiple)',true);
+  addRequirement(categoryField,'categories','Select at least one category.');section.append(categoryField);
   const hint=document.createElement('p');hint.className='note';hint.textContent=file.categorySource==='manual'?'Manual classification. Preserved during reanalysis.':'Automatic filename classification. Unknown when uncertain.';
   const reanalyze=document.createElement('button');reanalyze.type='button';reanalyze.className='secondary-button';reanalyze.textContent='Reanalyze filename';
   reanalyze.addEventListener('click',()=>{
@@ -124,9 +125,24 @@ function renderReviewCategories(file){
     inferReviewCategories(file);file.rowElement?.querySelector('.review-categories')?.replaceWith(renderReviewCategories(file));scheduleDraftSave();
   });
   section.append(hint,reanalyze);
-  section.append(attributePicker(file.attributeIds,ids=>{file.attributeIds=ids;scheduleDraftSave();}));
+  const attributeField=attributePicker(file.attributeIds,ids=>{file.attributeIds=ids;scheduleDraftSave();refreshValidation();});
+  addRequirement(attributeField,'attributes','Select at least one attribute.');section.append(attributeField);
+  const required=document.createElement('p');required.className='note';required.textContent='Required for each included file: at least one category and one attribute.';section.append(required);
   if(file.excluded)section.querySelectorAll('input,button').forEach(control=>control.disabled=true);
   return section;
+  function addRequirement(field,name,message){
+    field.dataset.reviewField=name;
+    const error=document.createElement('p');error.className='classification-error';error.textContent=message;error.hidden=true;error.id=`review-required-${crypto.randomUUID()}`;
+    field.setAttribute('aria-describedby',error.id);field.append(error);
+  }
+  function refreshValidation(){
+    if(file.rowElement?.classList.contains('incomplete'))updateIncompleteHighlights(file);
+    updateRowStatus(file);
+    if(!hasIncompleteFiles()&&executeStatus.textContent.startsWith('Complete the required details')){
+      executeStatus.classList.remove('error');
+      executeStatus.textContent=duplicateCheckComplete?'Required details complete.':'Required details complete. Check duplicates before organizing.';
+    }
+  }
 }
 async function catalogAction(action){
   if(operationBusy||draftLockedElsewhere)return;

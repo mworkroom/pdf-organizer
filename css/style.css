@@ -693,7 +693,7 @@
     .batch-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
     .batch-navigation { display: flex; gap: 8px; flex-wrap: wrap; }
     .batch-navigation .secondary-button { margin: 0; }
-    .execute-area { margin: 12px 0 16px; padding: 0 0 16px; border-top: 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .execute-area { margin: 20px 0 0; padding: 16px 0 0; border-top: 1px solid var(--border); border-bottom: 0; flex-wrap: wrap; }
     .execute-status { flex: 1 1 280px; }
     input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--text); flex-shrink: 0; }
     .source-header { flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -803,6 +803,8 @@
 
 /* Continuous review uses the page scroll; library selection stays beside its results. */
 .review-intro { margin: 14px 0 20px; }
+.review-categories .category-picker.incomplete-input { border: 2px solid #171717; outline: 2px solid rgba(17, 17, 17, 0.18); }
+.review-categories .classification-error { flex-basis: 100%; margin: 4px 0 0; font-size: 14px; font-weight: 600; }
 .review-cards .source-header { flex-wrap: nowrap; }
 .review-cards .source-file { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .review-cards .source-header .secondary-button { margin: 0; }

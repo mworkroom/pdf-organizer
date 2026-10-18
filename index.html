@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
 
-  <link rel="stylesheet" href="css/style.css?v=20261018-resume-batch">
+  <link rel="stylesheet" href="css/style.css?v=20261019-bottom-actions">
 </head>
 
 <body>
@@ -71,14 +71,14 @@
 
     <section id="sortingPanel" class="panel hidden">
       <div class="batch-heading"><div><h2 id="batchTitle">Current batch</h2><p id="batchSummary" class="note"></p></div><div class="batch-navigation"><button id="deferBatchButton" class="secondary-button" type="button">Defer batch</button><button id="nextBatchButton" class="secondary-button" type="button" disabled>Review next 100</button></div></div>
+      <p class="note review-intro">Review 1–100 files at a time. Each included file needs at least one category and one attribute before checking duplicates or organizing. Changes are saved automatically.</p>
+      <section id="sortingList" class="review-cards" aria-label="Files to review"></section>
       <div class="execute-area">
         <button id="duplicateCheckButton" class="check-button">Check duplicates</button>
         <button id="cancelDuplicateCheckButton" class="secondary-button hidden" type="button">Cancel check</button>
         <button id="executeButton" class="execute-button">Organize batch</button>
         <div id="executeStatus" class="execute-status" role="status" aria-live="polite"></div>
       </div>
-      <p class="note review-intro">Review 1–100 files at a time, then check duplicates and organize this batch. Changes are saved automatically.</p>
-      <section id="sortingList" class="review-cards" aria-label="Files to review"></section>
     </section>
 
     <section id="deferredPanel" class="panel hidden"><div class="panel-header"><div><h2>Deferred and excluded files <span id="deferredCount"></span></h2><p class="note">These files remain in the download folder and are not included in the next batch automatically.</p></div><button id="reviewDeferredButton" class="secondary-button" type="button">Review deferred files</button></div><div id="deferredFileList" class="list"></div></section>
@@ -124,26 +124,26 @@
     <section class="panel"><h2>Designer folders</h2><p class="note">Browse designers in the connected pattern folder.</p><input type="search" id="designerSearch" class="search-box" placeholder="Search designers" aria-label="Search designers" disabled><div id="designerFolderList" class="list"><p class="empty">Select a pattern folder first.</p></div></section>
   </main>
 
-  <script src="js/draft-store.js?v=20261018-resume-batch" defer></script>
-  <script src="js/utils.js?v=20261018-resume-batch" defer></script>
-  <script src="js/storage.js?v=20261018-resume-batch" defer></script>
-  <script src="js/aliases.js?v=20261018-resume-batch" defer></script>
-  <script src="js/logs.js?v=20261018-resume-batch" defer></script>
-  <script src="js/organizer.js?v=20261018-resume-batch" defer></script>
-  <script src="js/review.js?v=20261018-resume-batch" defer></script>
-  <script src="js/library.js?v=20261018-resume-batch" defer></script>
-  <script src="js/batch.js?v=20261018-resume-batch" defer></script>
-  <script src="js/catalog-model.js?v=20261018-resume-batch" defer></script>
-  <script src="js/gallery-model.js?v=20261018-resume-batch" defer></script>
-  <script src="js/thumbnail-store.js?v=20261018-resume-batch" defer></script>
-  <script src="js/pdf-preview.js?v=20261018-resume-batch" defer></script>
-  <script src="js/review-previews.js?v=20261018-resume-batch" defer></script>
-  <script src="js/gallery.js?v=20261018-resume-batch" defer></script>
-  <script src="js/library-bulk.js?v=20261018-resume-batch" defer></script>
-  <script src="js/catalog.js?v=20261018-resume-batch" defer></script>
-  <script src="js/attribute-manager.js?v=20261018-resume-batch" defer></script>
-  <script src="js/maintenance-model.js?v=20261018-resume-batch" defer></script>
-  <script src="js/maintenance.js?v=20261018-resume-batch" defer></script>
-  <script src="js/app.js?v=20261018-resume-batch" defer></script>
+  <script src="js/draft-store.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/utils.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/storage.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/aliases.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/logs.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/organizer.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/review.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/library.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/batch.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/catalog-model.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/gallery-model.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/thumbnail-store.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/pdf-preview.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/review-previews.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/gallery.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/library-bulk.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/catalog.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/attribute-manager.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/maintenance-model.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/maintenance.js?v=20261019-bottom-actions" defer></script>
+  <script src="js/app.js?v=20261019-bottom-actions" defer></script>
 </body>
 </html>

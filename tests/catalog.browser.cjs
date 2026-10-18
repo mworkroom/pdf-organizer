@@ -58,6 +58,7 @@ async function main(){
     const secondIncoming=page.locator('#sortingList .sort-row').filter({hasText:'Source file: Designer_Pattern_002.pdf'});
     await secondIncoming.getByRole('checkbox',{name:'Unknown',exact:true}).check();
     await secondIncoming.getByRole('checkbox',{name:'Hat',exact:true}).check();await secondIncoming.getByRole('checkbox',{name:'Shawl',exact:true}).check();
+    await page.evaluate(()=>{for(const file of downloadFiles)file.attributeIds=['texture'];renderSortingRows();scheduleDraftSave();});
     await ui('Check duplicates').click();await waitReport(()=>JSON.parse(document.getElementById('qaReport').textContent).checked);
     await ui('Inject metadata save failure').click();await ui('Organize batch').click();
     await page.waitForFunction(()=>document.getElementById('executeStatus').textContent.includes('Run failed')&&!document.getElementById('duplicateCheckButton').disabled);
