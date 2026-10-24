@@ -102,17 +102,21 @@ function renderDownloadFileList() {
 }
 function renderDesignerFolders(folders) {
   designerFolderList.innerHTML = "";
+  const keyword=normalizeText(designerSearch.value);
+  folders=folders.filter(name=>normalizeText(name).includes(keyword)&&(!designerFavoritesOnly||isFavoriteDesigner(name)));
 
   if (folders.length === 0) {
     designerFolderList.innerHTML =
-      `<p class="empty">No results found.</p>`;
+      `<p class="empty">${!libraryDirectoryHandle?'Select a pattern folder first.':designerFavoritesOnly&&!favoriteDesignerNames().length?'No favorite designers yet. Choose All designers and select ☆ beside a designer name.':'No results found.'}</p>`;
     return;
   }
 
   folders.forEach((folderName) => {
     const item = document.createElement("div");
     item.className = "designer-item";
-    item.textContent = folderName;
+    const name=document.createElement('button');name.type='button';name.className='pattern-link designer-folder-name';name.textContent=folderName;name.dataset.galleryAction='';name.title='Show patterns by this designer';
+    name.onclick=()=>{filterGalleryDesigner(folderName);document.querySelector('.gallery-panel').scrollIntoView({block:'start'});};
+    item.append(name,favoriteDesignerButton(folderName));
     designerFolderList.appendChild(item);
   });
 }

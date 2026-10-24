@@ -25,7 +25,7 @@ const CatalogModel = (() => {
   }
   const attributeIds=(ids,definitions=defaultAttributes)=>definitions.filter(item=>Array.isArray(ids)&&ids.includes(item.id)).map(item=>item.id);
   const hasManualClassification=pattern=>pattern.categorySource==='manual'||Boolean(pattern.attributeIds?.length);
-  const create = () => ({version:1, revision:0, libraryId:crypto.randomUUID(), attributes:structuredClone(defaultAttributes), categories:definitions.map(([name, words])=>({id:idFor(name),name,keywords:words?words.split(','):[]})), patterns:[]});
+  const create = () => ({version:1, revision:0, libraryId:crypto.randomUUID(), favoriteDesigners:[], attributes:structuredClone(defaultAttributes), categories:definitions.map(([name, words])=>({id:idFor(name),name,keywords:words?words.split(','):[]})), patterns:[]});
   function categoryIds(ids, categories) {
     const known=new Set(categories.map(c=>c.id));
     const result=[...new Set((Array.isArray(ids)?ids:[]).filter(id=>known.has(id)))];
@@ -44,6 +44,7 @@ const CatalogModel = (() => {
   function validate(value) {
     const fail=()=>{throw new Error('Invalid metadata format or unsupported version. The original JSON will not be overwritten.');};
     if(!value||value.version!==1||!Number.isSafeInteger(value.revision)||value.revision<0||typeof value.libraryId!=='string'||!value.libraryId||!Array.isArray(value.categories)||!Array.isArray(value.patterns))fail();
+    if(value.favoriteDesigners!==undefined&&(!Array.isArray(value.favoriteDesigners)||value.favoriteDesigners.some(name=>typeof name!=='string'||!name.trim())||new Set(value.favoriteDesigners).size!==value.favoriteDesigners.length))fail();
     let definitions;
     try{definitions=validateAttributes(value.attributes===undefined?defaultAttributes:value.attributes);}catch{fail();}
     const knownAttributes=new Set(definitions.map(item=>item.id));

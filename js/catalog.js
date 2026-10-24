@@ -160,6 +160,7 @@ function renderCatalogControls(){
 }
 function renderCatalogUI(){
   renderCategoryManager();renderAttributeManager();renderLibraryPatterns();
+  renderDesignerFolders(designerFolders);
   if(typeof renderMaintenance==='function')renderMaintenance();
   renderCatalogControls();
   if(operationBusy)setOperationBusy(true);

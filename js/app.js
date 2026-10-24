@@ -212,13 +212,7 @@ selectLibraryFolderButton.addEventListener("click", async () => {
 });
 
 designerSearch.addEventListener("input", () => {
-  const keyword = normalizeText(designerSearch.value);
-
-  const filteredFolders = designerFolders.filter((folderName) =>
-    normalizeText(folderName).includes(keyword)
-  );
-
-  renderDesignerFolders(filteredFolders);
+  renderDesignerFolders(designerFolders);
 });
 
 clearLogButton.addEventListener("click", () => {
@@ -450,6 +444,7 @@ executeButton.addEventListener("click", async () => {
 
 initializeBatchControls();
 initializeGalleryControls();
+initializeDesignerFavorites();
 initializeCatalogControls();
 initializeMaintenanceControls();
 initializeNavigation();

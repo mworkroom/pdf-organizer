@@ -12,6 +12,18 @@ function load(){
 function record(path='Designer/Sweater.pdf',ids=['sweater'],source='manual'){
   return {id:'pattern-1',path,size:10,lastModified:1,present:true,categoryIds:ids,categorySource:source,representativePage:1};
 }
+
+test('favorite designers accept legacy metadata, stay scoped to the library and survive rescans',()=>{
+  const {run}=load();
+  run('var catalog=CatalogModel.create();delete catalog.favoriteDesigners;CatalogModel.validate(catalog);');
+  run('catalog.favoriteDesigners=["Alice", "A_B", "Empty folder"];var next=CatalogModel.reconcile(catalog,[{path:"Alice/Hat.pdf",name:"Hat.pdf",size:1,lastModified:1}]);CatalogModel.validate(next);');
+  assert.equal(run('JSON.stringify(next.favoriteDesigners)'), '["Alice","A_B","Empty folder"]');
+  assert.equal(run('CatalogModel.create().favoriteDesigners.length'),0);
+  assert.equal(run('JSON.stringify(CatalogModel.validate(JSON.parse(JSON.stringify(next))).favoriteDesigners)'), '["Alice","A_B","Empty folder"]');
+  for(const invalid of [null,'Alice',[''],['  '],[42],['Alice','Alice']]){
+    assert.throws(()=>run(`CatalogModel.validate({...catalog,favoriteDesigners:${JSON.stringify(invalid)}})`),/metadata format/);
+  }
+});
 test('23 defaults and conservative English/Korean multiple category inference',()=>{
   const {run}=load();
   assert.equal(run('CatalogModel.create().categories.length'),23);

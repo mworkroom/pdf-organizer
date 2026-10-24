@@ -9,6 +9,19 @@ function catalog(){return {categories:[{id:'sweater',name:'Sweater'},{id:'hat',n
   {id:'old',path:'Missing.pdf',present:false,categoryIds:['hat'],size:105,lastModified:6}
 ]};}
 const ids=items=>Array.from(items,p=>p.id);
+
+test('favorites intersect designer, category, attributes and search, including Singles and missing designers',()=>{
+  const m=load(),c=catalog();
+  assert.deepEqual(ids(m.select(c,{favoritesOnly:true})),[]);
+  c.favoriteDesigners=['Alice','Bora','Missing designer'];
+  assert.deepEqual(ids(m.select(c,{favoritesOnly:true})),['e','a','b']);
+  c.patterns[0].attributeIds=['texture'];
+  assert.deepEqual(ids(m.select(c,{favoritesOnly:true,designerName:'Alice',category:'hat',attributes:['texture'],query:'sweater'})),['a']);
+  assert.deepEqual(ids(m.select(c,{favoritesOnly:true,query:'Bora'})),['e']);
+  c.favoriteDesigners=['Bora'];
+  assert.deepEqual(ids(m.select(c,{favoritesOnly:true,designerName:'Alice'})),[]);
+  assert.equal(m.select(c).length,5);
+});
 test('gallery searches all present root, Singles and nested PDFs; missing history stays hidden',()=>{const m=load();assert.equal(m.select(catalog()).length,5);assert.deepEqual(ids(m.select(catalog(),{query:'special nested'})),['d']);assert.deepEqual(ids(m.select(catalog(),{query:'BORA top'})),['e']);});
 test('category filter includes every multiple classification and intersects designer/search',()=>{const m=load();assert.deepEqual(ids(m.select(catalog(),{category:'hat',designerName:'Alice',query:'sweater'})),['a']);assert.equal(m.select(catalog(),{category:'unknown'}).length,2);assert.equal(m.select(catalog(),{query:'sweater',category:'unknown'}).length,0);});
 test('renamed labels are searchable without changing category IDs',()=>{const m=load(),c=catalog();c.categories[0].name='Pullovers';assert.deepEqual(ids(m.select(c,{query:'PULLOVERS alice'})),['a','b']);assert.equal(m.select(c,{category:'sweater'}).length,2);});

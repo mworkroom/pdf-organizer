@@ -45,6 +45,7 @@ function pdfOpenStatus(message){
 }
 
 async function reloadLibraryData() {
+  favoriteDesignerStatus('');
   designerFolders = [];
   singlesPdfNames = [];
   singlesDirectoryHandle = null;

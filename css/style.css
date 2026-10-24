@@ -768,6 +768,17 @@
 .pattern-info { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; min-width: 0; }
 .pattern-title { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .pattern-designer { font-size: 15px; }
+.pattern-designer-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pattern-designer-row .pattern-designer { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.designer-favorite-button { flex: 0 0 36px; min-width: 36px; min-height: 36px; padding: 3px; margin: 0 !important; font-size: 24px; line-height: 1.2; color: #444; background: white; border: 1px solid #bbb; }
+.designer-favorite-button[aria-pressed="true"] { color: #111; background: #f0f0f0; border-color: #555; }
+.designer-scope { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.designer-scope button { margin: 0; min-height: 44px; font-size: 15px; }
+.designer-scope button[aria-pressed="true"] { background: #111; color: white; }
+.favorite-status:empty { display: none; }
+.favorite-status { margin-bottom: 12px; overflow-wrap: anywhere; }
+#designerFolderList .designer-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.designer-folder-name { flex: 1; min-width: 0; font-size: 16px; overflow-wrap: anywhere; }
 .pattern-path { font-size: 14px; color: #555; overflow-wrap: anywhere; }
 .pattern-gallery .category-labels { font-size: 14px; margin: 0; color: #333; }
 .pattern-page-caption { display: block; font-size: 14px; color: #555; margin-bottom: 14px; }
