@@ -238,7 +238,7 @@ function initializeCatalogControls(){
   const cancel=document.createElement('button');cancel.id='cancelCategoryEditsButton';cancel.type='button';cancel.className='secondary-button';cancel.dataset.catalogControl='';cancel.textContent='Cancel category edits';
   document.getElementById('saveCategoriesButton').after(cancel);
   cancel.onclick=()=>{categoryEditorDirty=false;document.getElementById('newCategoryName').value='';renderCategoryManager();renderCatalogControls();setCatalogStatus('Category edits canceled. Saved classifications are preserved.');};
-  document.getElementById('refreshLibraryButton').onclick=()=>catalogAction(async()=>{await loadLibraryCatalog();});
+  document.getElementById('refreshLibraryButton').onclick=()=>catalogAction(async()=>{await reloadLibraryData();});
   document.getElementById('saveCategoriesButton').onclick=()=>catalogAction(async()=>{const next=structuredClone(libraryCatalog);next.categories=categoryManagerDraft();await persistCatalog(next);categoryEditorDirty=false;});
   document.getElementById('addCategoryButton').onclick=()=>catalogAction(async()=>{
     const input=document.getElementById('newCategoryName'),name=input.value.trim();if(!name)throw new Error('Enter a new category name.');

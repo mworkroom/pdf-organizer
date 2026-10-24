@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Organizer</title>
 
-  <link rel="stylesheet" href="css/style.css?v=20261024-favorites">
+  <link rel="stylesheet" href="css/style.css?v=20261025-excluded-attributes">
 </head>
 
 <body>
@@ -107,7 +107,7 @@
       <div class="gallery-search"><label for="librarySearch">Search patterns</label><input id="librarySearch" type="search" class="text-input" placeholder="Search filenames, designers, categories, and attributes" disabled></div>
       <div class="designer-scope" role="group" aria-label="Gallery designer scope"><button id="galleryAllDesignersButton" class="secondary-button" type="button" aria-pressed="true" disabled>All designers</button><button id="galleryFavoritesButton" class="secondary-button" type="button" aria-pressed="false" disabled>Favorites</button></div>
       <p id="galleryFavoriteStatus" class="note favorite-status" role="status" aria-live="polite"></p>
-      <div class="gallery-toolbar"><label>Category<select id="libraryCategoryFilter" class="text-input" disabled><option value="">All categories</option></select></label><div id="libraryAttributeFilter" class="gallery-attribute-filter"></div><label>Designer<select id="libraryDesignerFilter" class="text-input" disabled><option value="">All designers</option></select></label><label>Sort by<select id="librarySort" class="text-input" disabled><option value="name">File name</option><option value="designer">Designer</option><option value="recent">Last modified</option></select></label><button id="clearGalleryFiltersButton" class="secondary-button" type="button" disabled>Clear filters</button><div class="gallery-view-options" role="group" aria-label="Library view"><button id="galleryGridButton" class="secondary-button" type="button" aria-pressed="true" disabled>Gallery</button><button id="galleryListButton" class="secondary-button" type="button" aria-pressed="false" disabled>List</button></div></div>
+      <div class="gallery-toolbar"><label>Category<select id="libraryCategoryFilter" class="text-input" disabled><option value="">All categories</option></select></label><div id="libraryAttributeFilter" class="gallery-attribute-filter"></div><div id="libraryExcludedAttributeFilter" class="gallery-attribute-filter"></div><label>Designer<select id="libraryDesignerFilter" class="text-input" disabled><option value="">All designers</option></select></label><label>Sort by<select id="librarySort" class="text-input" disabled><option value="name">File name</option><option value="designer">Designer</option><option value="recent">Last modified</option></select></label><button id="clearGalleryFiltersButton" class="secondary-button" type="button" disabled>Clear filters</button><div class="gallery-view-options" role="group" aria-label="Library view"><button id="galleryGridButton" class="secondary-button" type="button" aria-pressed="true" disabled>Gallery</button><button id="galleryListButton" class="secondary-button" type="button" aria-pressed="false" disabled>List</button></div></div>
       <div class="library-selection-entry"><button id="librarySelectButton" class="secondary-button" type="button" aria-pressed="false" aria-controls="libraryBulkTools" disabled>Select patterns</button><p class="note">Filter by category, attributes, and designer to classify existing patterns together.</p></div>
       <section id="libraryBulkTools" class="library-bulk-tools hidden" aria-label="Bulk category and attribute editing">
         <div class="library-selection-actions"><strong id="librarySelectionCount" role="status" aria-live="polite">0 selected</strong><button id="selectLibraryPageButton" class="secondary-button" type="button">Select this page</button><button id="selectLibraryResultsButton" class="secondary-button" type="button">Select all results</button><button id="clearLibrarySelectionButton" class="secondary-button" type="button">Clear selection</button></div>
@@ -126,27 +126,27 @@
     <section class="panel"><h2>Designer folders</h2><p class="note">Select ☆ to save a favorite designer. Select a name to browse their patterns.</p><div class="designer-scope" role="group" aria-label="Designer folder scope"><button id="designerAllDesignersButton" class="secondary-button" type="button" aria-pressed="true" disabled>All designers</button><button id="designerFavoritesButton" class="secondary-button" type="button" aria-pressed="false" disabled>Favorites</button></div><p id="designerFavoriteStatus" class="note favorite-status" role="status" aria-live="polite"></p><input type="search" id="designerSearch" class="search-box" placeholder="Search designers" aria-label="Search designers" disabled><div id="designerFolderList" class="list"><p class="empty">Select a pattern folder first.</p></div></section>
   </main>
 
-  <script src="js/draft-store.js?v=20261024-favorites" defer></script>
-  <script src="js/utils.js?v=20261024-favorites" defer></script>
-  <script src="js/storage.js?v=20261024-favorites" defer></script>
-  <script src="js/aliases.js?v=20261024-favorites" defer></script>
-  <script src="js/logs.js?v=20261024-favorites" defer></script>
-  <script src="js/organizer.js?v=20261024-favorites" defer></script>
-  <script src="js/review.js?v=20261024-favorites" defer></script>
-  <script src="js/library.js?v=20261024-favorites" defer></script>
-  <script src="js/batch.js?v=20261024-favorites" defer></script>
-  <script src="js/catalog-model.js?v=20261024-favorites" defer></script>
-  <script src="js/gallery-model.js?v=20261024-favorites" defer></script>
-  <script src="js/thumbnail-store.js?v=20261024-favorites" defer></script>
-  <script src="js/pdf-preview.js?v=20261024-favorites" defer></script>
-  <script src="js/review-previews.js?v=20261024-favorites" defer></script>
-  <script src="js/gallery.js?v=20261024-favorites" defer></script>
-  <script src="js/designer-favorites.js?v=20261024-favorites" defer></script>
-  <script src="js/library-bulk.js?v=20261024-favorites" defer></script>
-  <script src="js/catalog.js?v=20261024-favorites" defer></script>
-  <script src="js/attribute-manager.js?v=20261024-favorites" defer></script>
-  <script src="js/maintenance-model.js?v=20261024-favorites" defer></script>
-  <script src="js/maintenance.js?v=20261024-favorites" defer></script>
-  <script src="js/app.js?v=20261024-favorites" defer></script>
+  <script src="js/draft-store.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/utils.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/storage.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/aliases.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/logs.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/organizer.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/review.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/library.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/batch.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/catalog-model.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/gallery-model.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/thumbnail-store.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/pdf-preview.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/review-previews.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/gallery.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/designer-favorites.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/library-bulk.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/catalog.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/attribute-manager.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/maintenance-model.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/maintenance.js?v=20261025-excluded-attributes" defer></script>
+  <script src="js/app.js?v=20261025-excluded-attributes" defer></script>
 </body>
 </html>

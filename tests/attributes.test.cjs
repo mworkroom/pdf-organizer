@@ -8,6 +8,40 @@ function load(){
 }
 const record=(id,categoryIds=['cardigan'])=>({id,path:`Designer/${id}.pdf`,size:100,lastModified:1,present:true,categoryIds,categorySource:'filename',representativePage:2,sha256:'a'.repeat(64)});
 
+function exclusionFixture(){
+  const loaded=load();
+  loaded.context.records=[record('legacy'),{...record('empty'),attributeIds:[]},{...record('texture'),attributeIds:['texture']},{...record('men'),attributeIds:['texture','audience-men']},{...record('kids'),attributeIds:['texture','audience-kids']},{...record('both'),attributeIds:['audience-men','audience-kids']},{...record('stranded'),attributeIds:['stranded']},{...record('missing'),attributeIds:[],present:false}];
+  loaded.run('catalog.attributes.push({id:"audience-men",name:"Men"},{id:"audience-kids",name:"Kids"});catalog.patterns=records;catalog.favoriteDesigners=["Designer"];CatalogModel.validate(catalog);');
+  return {...loaded,ids:options=>loaded.json(`GalleryModel.select(catalog,${JSON.stringify(options)}).map(p=>p.id)`).sort()};
+}
+
+test('excluding Men and Kids rejects either tag and preserves unassigned and unrelated attributes',()=>{
+  const {ids,run}=exclusionFixture();
+  run('var original=JSON.stringify(catalog);');
+  assert.deepEqual(ids({excludedAttributes:['audience-men','audience-kids']}),['empty','legacy','stranded','texture']);
+  assert.deepEqual(ids({excludedAttributes:['audience-men']}),['empty','kids','legacy','stranded','texture']);
+  assert.deepEqual(ids({excludedAttributes:[]}),['both','empty','kids','legacy','men','stranded','texture']);
+  assert.equal(run('JSON.stringify(catalog)===original'),true);
+});
+
+test('exclusions intersect include-all, category, search, designer and favorite filters using stable IDs',()=>{
+  const {ids,run}=exclusionFixture();
+  const options={attributes:['texture'],excludedAttributes:['audience-men','audience-kids'],category:'cardigan',designerName:'Designer',favoritesOnly:true,query:'texture'};
+  assert.deepEqual(ids(options),['texture']);
+  assert.deepEqual(ids({...options,category:'socks'}),[]);
+  assert.deepEqual(ids({...options,attributes:['texture','stranded']}),[]);
+  run('catalog.attributes.find(item=>item.id==="audience-men").name="Menswear";');
+  assert.deepEqual(ids(options),['texture']);
+  run('catalog.favoriteDesigners=[];');assert.deepEqual(ids(options),[]);
+});
+
+test('exclusions also apply with Any and None while legacy missing attributes count as empty',()=>{
+  const {ids}=exclusionFixture();
+  assert.deepEqual(ids({attributeMode:'any',attributes:['texture'],excludedAttributes:['audience-men','audience-kids']}),['empty','legacy','stranded','texture']);
+  assert.deepEqual(ids({attributeMode:'none',excludedAttributes:['audience-men','audience-kids']}),['empty','legacy']);
+  assert.deepEqual(ids({attributes:['audience-men'],excludedAttributes:['audience-men']}),[]);
+});
+
 test('legacy catalogs and v1/v2 reviews remain readable without changing existing classifications',()=>{
   const {context,run,json}=load();context.pattern=record('legacy');context.BATCH_LIMIT=100;
   run('catalog.patterns=[pattern];var original=JSON.stringify(catalog);CatalogModel.validate(catalog);');

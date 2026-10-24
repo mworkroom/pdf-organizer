@@ -35,8 +35,10 @@ async function main(){
     assert.equal(await page.getByRole('combobox',{name:'Designer',exact:true}).inputValue(),chosenDesigner);
     assert.match(await page.locator('#libraryPageSummary').innerText(),/Page 1/);assert.equal(await page.locator('#librarySelectionCount').innerText(),'0 selected');
     assert.equal(await page.locator('.library-pattern.is-editing').count(),0);await button('Done selecting').click();await button('Clear filters').click();
-    await search('Una_Hat');await page.locator('.pattern-designer').click();
-    assert.equal(await page.getByRole('combobox',{name:'Designer',exact:true}).inputValue(),'Una');assert.equal(await page.locator('.library-pattern').count(),1);
+    await search('Una_Hat');
+    assert.equal(await page.locator('.pattern-designer').innerText(),'Una');assert.equal(await page.locator('.pattern-designer').evaluate(el=>el.tagName),'SPAN');
+    assert.equal(await page.getByRole('combobox',{name:'Designer',exact:true}).inputValue(),'');assert.equal(await page.locator('.library-pattern').count(),1);
+    assert.equal(await page.locator('#libraryDesignerFilter option[value="Una"]').count(),0);
     assert.equal(await page.getByRole('searchbox',{name:'Search patterns',exact:true}).inputValue(),'Una_Hat');
     await first().getByRole('button',{name:'Edit',exact:true}).click();assert.match(await first().locator('.pattern-path').innerText(),/!zz_Singles\/Una_Hat.pdf/);
     await button('Clear filters').click();

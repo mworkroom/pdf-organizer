@@ -38,7 +38,8 @@ function renderAttributeManager(){
         const replace=ids=>CatalogModel.attributeIds((ids||[]).flatMap(id=>id===attribute.id?(replacementId?[replacementId]:[]):[id]),next.attributes);
         for(const file of getAllReviewFiles())file.attributeIds=replace(file.attributeIds);
         for(const [id,ids] of libraryAttributeDrafts)libraryAttributeDrafts.set(id,replace(ids));
-        galleryAttributes=replace(galleryAttributes);libraryBulkAttributes=replace(libraryBulkAttributes);
+        galleryExcludedAttributes=replace(galleryExcludedAttributes);galleryAttributes=replace(galleryAttributes).filter(id=>!galleryExcludedAttributes.includes(id));libraryBulkAttributes=replace(libraryBulkAttributes);
+        if(galleryAttributeMode==='selected'&&!galleryAttributes.length)galleryAttributeMode='any';
         clearLibrarySelection('Selection cleared because the attribute list changed.');attributeEditorDirty=false;
       });
     };

@@ -1,5 +1,5 @@
 let galleryQuery='',galleryCategory='',galleryDesigner='',gallerySort='name',galleryLayout='grid';
-let galleryAttributes=[],galleryAttributeMode='any';
+let galleryAttributes=[],galleryExcludedAttributes=[],galleryAttributeMode='any';
 let gallerySearchPending=false;
 const libraryPageDrafts=new Map();
 let gallerySelectionCache;
@@ -70,7 +70,7 @@ const GalleryPreviews=(()=>{
   return {reset,observe,resume,suspend,obtain,get stats(){return {...stats,busy,urls:urls.size};}};
 })();
 
-function galleryState(){return {query:galleryQuery,category:galleryCategory,attributes:[...galleryAttributes],attributeMode:galleryAttributeMode,designerName:galleryDesigner,favoritesOnly:galleryFavoritesOnly,sort:gallerySort};}
+function galleryState(){return {query:galleryQuery,category:galleryCategory,attributes:[...galleryAttributes],excludedAttributes:[...galleryExcludedAttributes],attributeMode:galleryAttributeMode,designerName:galleryDesigner,favoritesOnly:galleryFavoritesOnly,sort:gallerySort};}
 function selectedGalleryPatterns(){
   const state=JSON.stringify(galleryState());
   if(!gallerySelectionCache||gallerySelectionCache.catalog!==libraryCatalog||gallerySelectionCache.state!==state)gallerySelectionCache={catalog:libraryCatalog,state,patterns:GalleryModel.select(libraryCatalog,galleryState())};
@@ -79,31 +79,43 @@ function selectedGalleryPatterns(){
 function populateGalleryFilters(){
   const host=document.getElementById('libraryAttributeFilter'),definitions=availableAttributes(),key=JSON.stringify(definitions);
   galleryAttributes=CatalogModel.attributeIds(galleryAttributes,definitions);
+  galleryExcludedAttributes=CatalogModel.attributeIds(galleryExcludedAttributes,definitions);
   if(host.dataset.attributes!==key||!host.children.length){
     const changed=()=>{gallerySearchPending=false;libraryPage=0;clearLibrarySelection(librarySelection.size?'Selection cleared because attributes changed.':'');renderLibraryPatterns();};
     const label=document.createElement('label');label.className='attribute-mode-label';label.textContent='Attributes condition';
     const mode=document.createElement('select');mode.id='libraryAttributeMode';mode.className='text-input';
     for(const [value,text] of [['any','Any'],['none','None'],['selected','Selected attributes']])mode.add(new Option(text,value));
     mode.onchange=()=>{galleryAttributeMode=mode.value;if(mode.value!=='selected')galleryAttributes=[];changed();};label.append(mode);
-    const picker=attributePicker(galleryAttributes,ids=>{galleryAttributes=ids;galleryAttributeMode=ids.length?'selected':'any';changed();},'Attributes (match all)');
+    const picker=attributePicker(galleryAttributes,ids=>{galleryAttributes=ids;galleryExcludedAttributes=galleryExcludedAttributes.filter(id=>!ids.includes(id));galleryAttributeMode=ids.length?'selected':'any';changed();},'Attributes (match all)');
     host.replaceChildren(label,picker);host.dataset.attributes=key;
   }
   host.querySelector('select').value=galleryAttributeMode;
   host.querySelector('fieldset').hidden=galleryAttributeMode==='none';
   host.querySelectorAll('input').forEach(input=>input.checked=galleryAttributes.includes(input.value));
+  const excludedHost=document.getElementById('libraryExcludedAttributeFilter');
+  if(excludedHost.dataset.attributes!==key||!excludedHost.children.length){
+    const picker=attributePicker(galleryExcludedAttributes,ids=>{
+      galleryExcludedAttributes=ids;galleryAttributes=galleryAttributes.filter(id=>!ids.includes(id));
+      if(galleryAttributeMode==='selected'&&!galleryAttributes.length)galleryAttributeMode='any';
+      gallerySearchPending=false;libraryPage=0;clearLibrarySelection(librarySelection.size?'Selection cleared because excluded attributes changed.':'');renderLibraryPatterns();
+    },'Exclude attributes (match any)');
+    const hint=document.createElement('p');hint.className='note';hint.textContent='Hide patterns with any checked attribute.';
+    excludedHost.replaceChildren(picker,hint);excludedHost.dataset.attributes=key;
+  }
+  excludedHost.querySelectorAll('input').forEach(input=>input.checked=galleryExcludedAttributes.includes(input.value));
   const category=document.getElementById('libraryCategoryFilter'),designer=document.getElementById('libraryDesignerFilter');
   category.replaceChildren(new Option('All categories',''));
   for(const item of availableCategories())category.add(new Option(item.name,item.id));
   if(!availableCategories().some(c=>c.id===galleryCategory))galleryCategory='';category.value=galleryCategory;
   designer.replaceChildren(new Option('All designers',''));
-  const designers=[...new Set((libraryCatalog?.patterns||[]).filter(p=>p.present).map(GalleryModel.designer).filter(name=>name&&(!galleryFavoritesOnly||isFavoriteDesigner(name))))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const designers=designerFolders.filter(name=>!galleryFavoritesOnly||isFavoriteDesigner(name));
   for(const name of designers)designer.add(new Option(name,name));
   if(galleryDesigner&&!designers.includes(galleryDesigner))galleryDesigner='';designer.value=galleryDesigner;
 }
 function renderGalleryControls(){
   const disabled=operationBusy||draftLockedElsewhere||!libraryCatalog;
   for(const id of ['librarySearch','libraryCategoryFilter','libraryDesignerFilter','librarySort','galleryGridButton','galleryListButton','clearGalleryFiltersButton','clearThumbnailCacheButton'])document.getElementById(id).disabled=disabled;
-  document.querySelectorAll('#libraryAttributeFilter input,#libraryAttributeFilter select').forEach(input=>input.disabled=disabled);
+  document.querySelectorAll('#libraryAttributeFilter input,#libraryAttributeFilter select,#libraryExcludedAttributeFilter input').forEach(input=>input.disabled=disabled);
   document.querySelectorAll('[data-gallery-action]').forEach(control=>control.disabled=disabled||Boolean(catalogError));
   const state=GalleryModel.page(selectedGalleryPatterns(),libraryPage);
   for(const id of ['libraryPreviousButton','galleryPreviousBottom'])document.getElementById(id).disabled=disabled||state.current===0;
@@ -133,8 +145,9 @@ function renderGallery(){
     const info=document.createElement('div');info.className='pattern-info';
     const title=document.createElement('button');title.type='button';title.className='pattern-link pattern-title';title.dataset.galleryAction='';title.textContent=file.name.replace(/\.pdf$/i,'');title.title='Open PDF';title.onclick=()=>openReviewPdf(file);
     const designerName=GalleryModel.designer(pattern);
-    const designer=document.createElement(designerName?'button':'span');designer.className='pattern-designer';designer.textContent=designerName||'Root / special folder';
-    if(designerName){designer.type='button';designer.classList.add('pattern-link');designer.dataset.galleryAction='';designer.title='Show patterns by this designer';designer.onclick=()=>filterGalleryDesigner(designerName);}
+    const hasDesignerFolder=designerFolders.includes(designerName);
+    const designer=document.createElement(hasDesignerFolder?'button':'span');designer.className='pattern-designer';designer.textContent=designerName||'Root / special folder';
+    if(hasDesignerFolder){designer.type='button';designer.classList.add('pattern-link');designer.dataset.galleryAction='';designer.title='Show patterns by this designer';designer.onclick=()=>filterGalleryDesigner(designerName);}
     const labels=document.createElement('span');labels.className='category-labels';labels.textContent=pattern.categoryIds.map(id=>libraryCatalog.categories.find(c=>c.id===id)?.name).join(' · ');
     const attributes=document.createElement('span');attributes.className='attribute-labels';attributes.textContent=attributeNames(pattern.attributeIds).join(' · ');
     const caption=document.createElement('span');caption.className='pattern-page-caption';caption.textContent=`Cover page ${GalleryModel.representative(pattern)}`;
@@ -222,7 +235,7 @@ function initializeGalleryControls(){
   document.getElementById('libraryDesignerFilter').onchange=event=>{galleryDesigner=event.target.value;filtersChanged();changed();};
   document.getElementById('librarySort').onchange=event=>{gallerySort=event.target.value;changed();};
   for(const mode of ['grid','list'])document.getElementById(mode==='grid'?'galleryGridButton':'galleryListButton').onclick=()=>{galleryLayout=mode;try{localStorage.setItem('pdfOrganizerLibraryLayout',mode);}catch{}renderLibraryPatterns();};
-  document.getElementById('clearGalleryFiltersButton').onclick=()=>{clearTimeout(searchTimer);galleryQuery='';galleryCategory='';galleryAttributes=[];galleryAttributeMode='any';galleryDesigner='';galleryFavoritesOnly=false;document.getElementById('librarySearch').value='';filtersChanged();changed();};
+  document.getElementById('clearGalleryFiltersButton').onclick=()=>{clearTimeout(searchTimer);galleryQuery='';galleryCategory='';galleryAttributes=[];galleryExcludedAttributes=[];galleryAttributeMode='any';galleryDesigner='';galleryFavoritesOnly=false;document.getElementById('librarySearch').value='';filtersChanged();changed();};
   document.getElementById('clearThumbnailCacheButton').onclick=async()=>{
     if(operationBusy)return;GalleryPreviews.suspend();setOperationBusy(true);
     let failed=false;

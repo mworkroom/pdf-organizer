@@ -23,7 +23,27 @@ async function main(){
     });
     assert.equal(await page.locator('#designerFolderList .designer-item').count(),450);
     await page.locator('#galleryFavoritesButton').click();assert.match(await page.locator('#libraryPatternList').innerText(),/No favorite designers yet/);
-    await page.locator('#galleryAllDesignersButton').click();await search('Sweater_000');
+    await page.locator('#galleryAllDesignersButton').click();
+    assert.equal(await page.locator('#libraryDesignerFilter option').count(),451);
+    assert.equal(await page.locator('#libraryDesignerFilter option[value="Una"],#libraryDesignerFilter option[value="!zz_Singles"],#libraryDesignerFilter option[value="!Special"]').count(),0);
+    // A physical folder is selectable even without PDFs; metadata-only names never become options.
+    const emptyDesigner='Designer 000 — A very long designer name for readable wrapping';
+    await page.locator('#libraryDesignerFilter').selectOption(emptyDesigner);assert.equal(await page.locator('.library-pattern').count(),0);
+    await mark(folder(emptyDesigner).getByRole('button',{name:`Add ${emptyDesigner} to favorites`,exact:true}));
+    await page.locator('#galleryFavoritesButton').click();assert.deepEqual(await page.locator('#libraryDesignerFilter option').allTextContents(),['All designers',emptyDesigner]);
+    await mark(folder(emptyDesigner).getByRole('button',{name:`Remove ${emptyDesigner} from favorites`,exact:true}));
+    assert.equal(await page.locator('#libraryDesignerFilter').inputValue(),'');await button('Clear filters').click();
+    // Refresh re-reads actual folders added or removed outside the app.
+    await page.evaluate(async()=>{
+      await libraryDirectoryHandle.getDirectoryHandle('Fresh designer',{create:true});
+      const next=structuredClone(libraryCatalog);next.patterns.find(p=>p.path==='Root_Sweater.pdf').designerName='Metadata-only root designer';next.patterns.find(p=>p.path==='!Special/Nested/Cowl.pdf').designerName='Metadata-only special designer';await persistCatalog(next);
+    });
+    await button('Refresh library').click();await idle();
+    assert.equal(await page.locator('#libraryDesignerFilter option[value="Fresh designer"]').count(),1);
+    assert.equal(await page.locator('#libraryDesignerFilter option[value^="Metadata-only"]').count(),0);
+    await page.evaluate(()=>libraryDirectoryHandle.removeEntry('Fresh designer'));await button('Refresh library').click();await idle();
+    assert.equal(await page.locator('#libraryDesignerFilter option[value="Fresh designer"]').count(),0);
+    await search('Sweater_000');
     const card=page.locator('.library-pattern');await card.getByRole('button',{name:'Edit',exact:true}).click();
     await card.getByRole('checkbox',{name:'texture',exact:true}).check();
     // Favorite saves preserve pending pattern edits, and keyboard activation works.
@@ -47,6 +67,7 @@ async function main(){
     await page.locator('#libraryAttributeFilter').getByRole('checkbox',{name:'texture',exact:true}).check();assert.equal(await page.locator('.library-pattern').count(),1);
     await button('Clear filters').click();await search('Una_Hat');await mark(card.getByRole('button',{name:'Add Una to favorites',exact:true}));
     await page.locator('#galleryFavoritesButton').click();assert.equal(await page.locator('.library-pattern').count(),1);
+    assert.deepEqual(await page.locator('#libraryDesignerFilter option').allTextContents(),['All designers','Alice Knits','Bora']);
     // Failure must leave both the visible favorite and durable metadata unchanged.
     const before=await saved();await button('Inject metadata save failure').click();
     await mark(folder('Bora').getByRole('button',{name:'Remove Bora from favorites',exact:true}));
@@ -93,7 +114,7 @@ async function main(){
     assert.equal(await page.locator('.designer-folder-name').evaluate(el=>el.scrollWidth<=el.clientWidth+1&&parseFloat(getComputedStyle(el).fontSize)>=16),true);
     assert.deepEqual(errors,[]);assert.ok(requests.every(url=>url.startsWith(base)||url.startsWith('blob:'+base)));
     await button('End sample session').click();
-    console.log(JSON.stringify({result:'PASS',designerFolders:450,viewports:[2048,1280],checks:['keyboard star','gallery and folder sync','combined filters','Singles','pending edits','selection reset','save failure','disk conflict','reload persistence','library isolation'],unexpectedErrors:errors.length,externalRequests:0}));
+    console.log(JSON.stringify({result:'PASS',designerFolders:450,viewports:[2048,1280],checks:['folder-only dropdown','empty folder option','external folder refresh','metadata-only names excluded','keyboard star','gallery and folder sync','combined filters','Singles','pending edits','selection reset','save failure','disk conflict','reload persistence','library isolation'],unexpectedErrors:errors.length,externalRequests:0}));
   }finally{await context.close();await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
