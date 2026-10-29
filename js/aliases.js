@@ -152,14 +152,18 @@ function rememberConnection(file) {
 
   file.autoLinkedAlias = alias;
 
-  applyRememberedConnectionsToEmptyFiles();
+  const linkedFiles = applyRememberedConnectionsToEmptyFiles();
+  // Keep the existing cards: rebuilding them drops focus and cached card heights.
+  for (const updatedFile of [file, ...linkedFiles]) {
+    updatedFile.refreshDesignerFields?.();
+  }
   invalidateDuplicateCheck();
-  renderSortingRows();
 }
 
 function applyRememberedConnectionsToEmptyFiles() {
+  const linkedFiles = [];
   if (designerFolders.length === 0) {
-    return;
+    return linkedFiles;
   }
 
   downloadFiles.forEach((file) => {
@@ -184,7 +188,9 @@ function applyRememberedConnectionsToEmptyFiles() {
     file.sourceDesignerName = match.alias;
     file.patternFileName = suggestPatternFileName(file.name, match.alias);
     file.autoLinkedAlias = match.alias;
+    linkedFiles.push(file);
   });
+  return linkedFiles;
 }
 
 function findMatchingRememberedAlias(originalFileName) {

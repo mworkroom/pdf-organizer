@@ -132,7 +132,7 @@ function renderReviewCards() {
   sortingList.innerHTML = "";
 
   for (const file of downloadFiles) {
-    for (const field of ["rowElement", "destinationInputElement", "patternInputElement", "previewElement", "statusElement"]) file[field] = null;
+    for (const field of ["rowElement", "destinationInputElement", "patternInputElement", "previewElement", "statusElement", "refreshDesignerFields"]) file[field] = null;
   }
   if (!downloadFiles.length) {
     sortingList.innerHTML = '<p class="empty">Batch complete. Open the next batch or review deferred files.</p>';
@@ -194,18 +194,11 @@ function renderReviewCards() {
     destinationInput.type = "text";
     destinationInput.setAttribute('aria-label', `Destination designer for ${file.name}`);
     destinationInput.placeholder = "e.g. Knitree, Mayo, Namu Knitree";
-    destinationInput.value = file.destinationName;
     destinationInput.disabled = file.excluded;
     file.destinationInputElement = destinationInput;
 
     const selectedLabel = document.createElement("div");
     selectedLabel.className = "selected-label";
-
-    if (file.selectedFolder) {
-      selectedLabel.textContent = file.autoLinkedAlias
-        ? `Alias matched: ${file.autoLinkedAlias} → ${file.selectedFolder}`
-        : `Existing designer selected: ${file.selectedFolder}`;
-    }
 
     const suggestionsContainer = document.createElement("div");
 
@@ -226,7 +219,6 @@ function renderReviewCards() {
     sourceDesignerInput.type = "text";
     sourceDesignerInput.setAttribute('aria-label', `Source designer for ${file.name}`);
     sourceDesignerInput.placeholder = "e.g. Knitree, Anna-Sofia Vintersol";
-    sourceDesignerInput.value = file.sourceDesignerName;
     sourceDesignerInput.disabled = file.excluded;
 
     const sourceDesignerHint = document.createElement("div");
@@ -235,8 +227,6 @@ function renderReviewCards() {
     rememberButton.type = "button";
     rememberButton.className = "secondary-button remember-button";
     rememberButton.textContent = "Remember alias";
-    rememberButton.disabled =
-      file.excluded || !getExistingFolderName(file);
 
     sourceDesignerField.appendChild(sourceDesignerLabel);
     sourceDesignerField.appendChild(sourceDesignerInput);
@@ -315,6 +305,24 @@ function renderReviewCards() {
     row.appendChild(body);
     sortingList.appendChild(row);
     ReviewPreviews.observe(file,cover,image,placeholder,caption,retry);
+
+    file.refreshDesignerFields = () => {
+      const filenameChanged = patternInput.value !== file.patternFileName;
+      destinationInput.value = file.destinationName;
+      sourceDesignerInput.value = file.sourceDesignerName;
+      patternInput.value = file.patternFileName;
+      selectedLabel.textContent = file.selectedFolder
+        ? file.autoLinkedAlias
+          ? `Alias matched: ${file.autoLinkedAlias} → ${file.selectedFolder}`
+          : `Existing designer selected: ${file.selectedFolder}`
+        : '';
+      suggestionsContainer.replaceChildren();
+      rememberButton.disabled = file.excluded || !getExistingFolderName(file);
+      if (filenameChanged) {
+        row.querySelector('.review-categories')?.replaceWith(renderReviewCategories(file));
+      }
+    };
+    file.refreshDesignerFields();
 
     excludeCheckbox.addEventListener("change", () => {
       file.excluded = excludeCheckbox.checked;
